@@ -1,0 +1,76 @@
+Name: processing
+Version: 1.0.0.0
+Author: Daniel Díaz
+Category: Graphics
+Build-type: Simple
+License: BSD3
+License-file: license
+Maintainer: Daniel Díaz (dhelta.diaz `at` gmail.com)
+Bug-reports: no-link-yet
+Synopsis: Web graphic applications with Processing.
+Description:
+  /Processing/ is a visual design programming language.
+  /Processing.js/ is the sister project of Processing designed
+  for the web.
+  The Haskell /processing/ package is a web animation library
+  with /Processing.js/ as backend.
+  .
+  /What is this for?/
+  .
+  With this library you are able to write scripts that, once
+  executed in a browser, will execute interactive visual programs.
+  .
+  /Where can I see a running example?/
+  .
+  An example output can be reached at <http://liibe.com/experimental/rocket.html>.
+  Also, take a look at <http://liibe.com/experimental/mill.html>.
+  The code of the latter is included in the source distribution (\/examples\/mill.hs).
+  .
+  /How do I learn to use it?/
+  .
+  The API reference of the library includes guidance and is complemented with
+  code examples. Look also to the /examples/ directory included in the source
+  distribution. It contains some fully working examples.
+Cabal-version: >= 1.6
+Extra-source-files:
+  readme.md
+  examples/twist.hs
+  examples/mill.hs
+
+Source-repository head
+  type: git
+  location: not-yet
+
+Library
+  Build-depends:
+      base == 4.*
+    , text
+    , containers
+    , transformers
+    , mainland-pretty
+    , hashable
+    , unordered-containers
+  Exposed-modules:
+    -- Core modules
+    Graphics.Web.Processing.Core.Types
+    Graphics.Web.Processing.Core.Interface
+    Graphics.Web.Processing.Core.Var
+    -- Basic interface
+    Graphics.Web.Processing.Basic
+    Graphics.Web.Processing.Basic.Baked
+    -- Mid interface
+    Graphics.Web.Processing.Mid
+    Graphics.Web.Processing.Mid.CustomVar
+    -- Simple interface
+    Graphics.Web.Processing.Simple
+    -- Default interface
+    Graphics.Web.Processing
+    -- Optimizations
+    Graphics.Web.Processing.Optimize
+  Other-modules:
+    Graphics.Web.Processing.Core.Primal
+    Graphics.Web.Processing.Core.Monad
+  Extensions: OverloadedStrings
+            , EmptyDataDecls
+            , DeriveGeneric
+  GHC-Options: -Wall
