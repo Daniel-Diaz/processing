@@ -6,7 +6,7 @@ Build-type: Simple
 License: BSD3
 License-file: license
 Maintainer: Daniel Díaz (dhelta.diaz `at` gmail.com)
-Bug-reports: no-link-yet
+Bug-reports: https://github.com/Daniel-Diaz/processing/issues
 Synopsis: Web graphic applications with Processing.
 Description:
   /Processing/ is a visual design programming language.
@@ -39,7 +39,7 @@ Extra-source-files:
 
 Source-repository head
   type: git
-  location: not-yet
+  location: git@github.com:Daniel-Diaz/processing.git
 
 Library
   Build-depends:
