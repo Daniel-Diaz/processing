@@ -50,6 +50,7 @@ Library
     , mainland-pretty
     , hashable
     , unordered-containers
+    , blaze-html
   Exposed-modules:
     -- Core modules
     Graphics.Web.Processing.Core.Types
@@ -67,6 +68,8 @@ Library
     Graphics.Web.Processing
     -- Optimizations
     Graphics.Web.Processing.Optimize
+    -- HTML
+    Graphics.Web.Processing.Html
   Other-modules:
     Graphics.Web.Processing.Core.Primal
     Graphics.Web.Processing.Core.Monad
