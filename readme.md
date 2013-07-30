@@ -4,6 +4,8 @@ Web graphic applications with
 [processing.js](http://processingjs.org)
 as backend.
 
+**Still in development!**
+
 # Examples
 
 Find examples of usage at the [examples](/examples)
