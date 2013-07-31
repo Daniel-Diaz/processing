@@ -80,9 +80,9 @@ displayFigure ::
   -> ProcScript
 displayFigure w h bgc f = execScriptM $ do
   on Setup $ do
-     size (maybe screenWidth fromInt w) (maybe screenHeight fromInt h)
      background bgc
   on Draw $ do
+     size (maybe screenWidth fromInt w) (maybe screenHeight fromInt h)
      translate (intToFloat screenWidth/2) (intToFloat screenHeight/2)
      figureEvent f
 
@@ -95,11 +95,13 @@ animateFigure ::
   -> (Proc_Int -> Figure) -- ^ Function to produce the next frame of animation,
                           --   given the current frame number.
   -> ProcScript
-animateFigure w h fr bgc f = execScriptM $ do
+animateFigure mw mh fr bgc f = execScriptM $ do
   on Setup $ do
-     size (maybe screenWidth fromInt w) (maybe screenHeight fromInt h)
      setFrameRate $ fromInt fr
   on Draw $ do
-     translate (intToFloat screenWidth/2) (intToFloat screenHeight/2)
+     let w = maybe screenWidth  fromInt mw
+         h = maybe screenHeight fromInt mh
+     size w h
      background bgc
+     translate (intToFloat w/2) (intToFloat h/2)
      frameCount >>= figureEvent . f

@@ -787,7 +787,7 @@ instance Reducible ProcArg where
  reduce x = x
 
 instance Reducible (ProcCode c) where
- reduce (Sequence sq) = Sequence $ fmap reduce $ foldr (
+ reduce (Sequence sq) = Sequence $ cleanCode $ fmap reduce $ foldr (
    \x xs -> 
      case Seq.viewl xs of
       y Seq.:< ys -> case reduceProcPair x y of
@@ -799,14 +799,25 @@ instance Reducible (ProcCode c) where
  reduce x = x
 
 reduceProcPair :: ProcCode c -> ProcCode c -> Maybe (ProcCode c)
+-- Translations
 reduceProcPair (Command "translate" [FloatArg x,FloatArg y])
                (Command "translate" [FloatArg x',FloatArg y'])
                  = Just $ Command "translate" [ FloatArg $ x+x'
                                               , FloatArg $ y+y']
+-- Rotations
 reduceProcPair (Command "rotate" [FloatArg x])
                (Command "rotate" [FloatArg x'])
                  = Just $ Command "rotate" [FloatArg $ x+x']
 reduceProcPair _ _ = Nothing
+
+cleanCode :: Seq.Seq (ProcCode c) -> Seq.Seq (ProcCode c)
+cleanCode = Seq.filter isRelevant
+
+isRelevant :: ProcCode c -> Bool
+isRelevant (Command "translate" [FloatArg 0, FloatArg 0]) = False
+isRelevant (Command "rotate" [FloatArg 0]) = False
+isRelevant (Sequence xs) = not $ Seq.null xs
+isRelevant _ = True
 
 ----
 

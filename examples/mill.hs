@@ -1,13 +1,16 @@
 
+{-# LANGUAGE OverloadedStrings #-}
+
 -- Recursive picture animation.
 --
 -- Inspired by a similar animation (not equal)
 -- to be found in the examples of the gloss library.
 
 import Graphics.Web.Processing.Simple
+import Graphics.Web.Processing.Html
 
 main :: IO ()
-main = renderFile "mill.pde" mill
+main = writeHtml "processing.js" "mill.pde" "Mill demo" "mill.html" mill
 
 mill :: ProcScript
 mill = animateFigure Nothing Nothing 50 (Color 0 0 0 255) millf
@@ -18,7 +21,9 @@ speed = 0.02
 millf :: Proc_Int -> Figure
 millf n =
  let t = intToFloat n * speed
- in  millUnit 0 250 t
+ in  FillColor (Color 0 0 0 0)
+   $ LineColor (Color 255 255 255 255)
+   $ millUnit 0 250 t
 
 millUnit :: Int -- ^ Recursive level.
          -> Proc_Float -- ^ Radius.
@@ -37,7 +42,7 @@ millUnit n r alpha =
      p3  = f $ 4*pi/3
      r'  = dist p1 p2 / 2
  in Rotate (if parity then alpha else (-2) * alpha)
-     $ FillColor (Color 0 0 0 0) $ LineColor (Color 255 255 255 255) $ mconcat [
+     $ mconcat [
          Line [p0,p1] , Line [p0,p2] , Line [p0,p3]
        , Circle p1 r' , Circle p2 r' , Circle p3 r'
        , Translate p1 $ millUnit (n+1) r' alpha

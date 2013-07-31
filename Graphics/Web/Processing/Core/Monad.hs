@@ -30,16 +30,20 @@ import Data.Text (Text)
 newtype ProcM c a = ProcM { unProcM :: StateT Int (Writer (ProcCode c)) a }
 
 -- | Generate Processing code using the 'ProcM' monad.
+--   The code output is reduced.
 runProcM :: ProcM c a -> (a,ProcCode c)
 runProcM = runProcMWith 0
 
 -- | Run a 'ProcM' computation with an initial var number.
---   It also applies 'reduce' to the output Processing code.
+--   It also applies a reduction to the output Processing code.
 runProcMWith :: Int -> ProcM c a -> (a,ProcCode c)
 runProcMWith n = second reduce . runWriter . (\sw -> evalStateT sw n) . unProcM
 
 -- | Generate Processing code using the 'ProcM' monad, discarding the final
 --   value.
+--
+-- > execProcM = snd . runProcM
+--
 execProcM :: ProcM c a -> ProcCode c
 execProcM = snd . runProcM
 
