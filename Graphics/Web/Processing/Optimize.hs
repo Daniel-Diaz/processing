@@ -141,6 +141,7 @@ floatsInCode :: ProcCode c -> Seq Proc_Float
 floatsInCode (Command _ xs) = getFloatArgs xs
 floatsInCode (Conditional _ c1 c2) = floatsInCode c1 <> floatsInCode c2
 floatsInCode (Sequence xs) = F.foldMap floatsInCode xs
+floatsInCode (Assignment (FloatAsign _ x)) = Seq.singleton x
 floatsInCode _ = mempty
 
 -- | Like 'mostFreq', but applied to a piece of code.
@@ -179,6 +180,7 @@ codesubs :: Proc_Float -- ^ Origin.
 codesubs o t (Command n xs) = Command n $ fmap (argsubs o t) xs
 codesubs o t (Conditional b c1 c2) = Conditional b (codesubs o t c1) (codesubs o t c2)
 codesubs o t (Sequence xs) = Sequence $ fmap (codesubs o t) xs
+codesubs o t (Assignment (FloatAsign n x)) = Assignment $ FloatAsign n $ floatsubs o t x
 codesubs _ _ c = c
 
 substitutionOver :: Int -> ProcCode c -> (ProcCode c, Int)
@@ -232,7 +234,7 @@ applySubstitution = do
   resetStack
 
 codeSubstitution :: ProcCode c -> SubsM c ()
-codeSubstitution a@(Assignment _) = applySubstitution >> addToWritten a
+codeSubstitution a@(Assignment _) = addToStack a >> applySubstitution
 codeSubstitution (Conditional b c1 c2) = do
   applySubstitution
   n0 <- substitutionIndex <$> get
