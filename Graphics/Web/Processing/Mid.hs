@@ -62,6 +62,8 @@ import Graphics.Web.Processing.Core.Interface
 -- variables
 import Graphics.Web.Processing.Core.Var (Var,varName)
 import qualified Graphics.Web.Processing.Core.Var as Var
+-- optimization
+import Graphics.Web.Processing.Optimize
 -- transformers
 import Control.Monad (void)
 import Control.Applicative
@@ -208,7 +210,7 @@ on c (EventM e) = ScriptM $ modify $ \ss ->
 execScriptM :: ScriptM Preamble () -> ProcScript
 execScriptM (ScriptM s0) =
   let s = execState s0 emptyScriptState
-  in  ProcScript
+  in  optimizeBySubstitution $ ProcScript
     { proc_preamble = execProcM $ script_code s
     , proc_setup = maybe mempty execProcM $ script_setup s
     , proc_draw = fmap execProcM $ script_draw s

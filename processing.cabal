@@ -48,9 +48,8 @@ Library
     , containers
     , transformers
     , mainland-pretty
-    , hashable
-    , unordered-containers
     , blaze-html
+    , multiset
   Exposed-modules:
     -- Core modules
     Graphics.Web.Processing.Core.Types

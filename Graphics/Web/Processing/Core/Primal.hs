@@ -1,5 +1,5 @@
 
-{-# LANGUAGE OverloadedStrings, DeriveGeneric, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- | Internal module. Mostly for type definitions
 --   and class instances.
@@ -20,6 +20,7 @@ module Graphics.Web.Processing.Core.Primal (
   , pfloor
   -- *** Float
   , Proc_Float (..), fromFloat
+  , recFloat
   , intToFloat
   , noisef
   -- *** Image
@@ -38,7 +39,7 @@ module Graphics.Web.Processing.Core.Primal (
   -- ** Variables
   , Var, varName, varFromText
   -- ** Script
-  , ProcCode, ProcArg, ProcAsign
+  , ProcCode (..), ProcArg (..), ProcAsign (..)
   , emptyCode
   , command , assignment, createVar, comment
   , conditional
@@ -65,9 +66,6 @@ import Data.Foldable (foldMap,foldr)
 import Control.Applicative (liftA2)
 -- Pretty
 import Text.PrettyPrint.Mainland
--- Hashable & Generics
-import Data.Hashable
-import GHC.Generics (Generic)
 
 -- | The /preamble/ is the code that is executed
 --   at the beginning of the script.
@@ -331,14 +329,33 @@ data Proc_Float =
  | Float_Floor Proc_Float -- Applies floor but it treats the result
                           -- as a float. Only internal.
  | Float_Noise Proc_Float Proc_Float
-   deriving (Eq,Generic)
-
-instance Hashable Proc_Float
+   deriving (Eq,Ord)
 
 instance Extended Float Proc_Float where
  extend = Proc_Float
  patmatch (Proc_Float x) = Just x
  patmatch _ = Nothing
+
+-- | /Float recursion/. Applies a function to the subexpressions
+--   of a 'Proc_Float'.
+recFloat :: (Proc_Float -> Proc_Float) -> Proc_Float -> Proc_Float
+recFloat f (Float_Sum x y) = Float_Sum (f x) (f y)
+recFloat f (Float_Substract x y) = Float_Substract (f x) (f y)
+recFloat f (Float_Divide x y) = Float_Divide (f x) (f y)
+recFloat f (Float_Mult x y) = Float_Mult (f x) (f y)
+recFloat f (Float_Mod x y) = Float_Mod (f x) (f y)
+recFloat f (Float_Abs x) = Float_Abs $ f x
+recFloat f (Float_Exp x) = Float_Exp $ f x
+recFloat f (Float_Sqrt x) = Float_Sqrt $ f x
+recFloat f (Float_Log x) = Float_Log $ f x
+recFloat f (Float_Sine x) = Float_Sine $ f x
+recFloat f (Float_Cosine x) = Float_Cosine $ f x
+recFloat f (Float_Arcsine x) = Float_Arcsine $ f x
+recFloat f (Float_Arccosine x) = Float_Arccosine $ f x
+recFloat f (Float_Arctangent x) = Float_Arctangent $ f x
+recFloat f (Float_Floor x) = Float_Floor $ f x
+recFloat f (Float_Noise x y) = Float_Noise (f x) (f y)
+recFloat _ x = x
 
 instance Pretty Proc_Float where 
  ppr (Proc_Float f) = ppr f
@@ -723,8 +740,7 @@ instance Reducible Proc_Float where
  -- (x*y)/z = x*(y/z)
  reduce (Float_Divide (Float_Mult x (Proc_Float y)) (Proc_Float z)) =
    reduce $ (x*) $ Proc_Float $ y / z
- reduce (Float_Divide x y) = reduce x / reduce y
- reduce x = x
+ reduce x = recFloat reduce x
 
 instance Reducible ProcArg where
  reduce (FloatArg x) = FloatArg $ iteratedReduce x
