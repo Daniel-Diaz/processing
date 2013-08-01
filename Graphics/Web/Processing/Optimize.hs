@@ -19,7 +19,6 @@ numOps (Float_Divide x y) = 1 + numOps x + numOps y
 numOps (Float_Mult x y) = 1 + numOps x + numOps y
 numOps (Float_Mod x y) = 1 + numOps x + numOps y
 numOps (Float_Var _) = 0
-numOps (Float_Pi) = 0
 numOps (Float_Abs x) = 1 + numOps x
 numOps (Float_Exp x) = 1 + numOps x
 numOps (Float_Sqrt x) = 1 + numOps x

@@ -1,5 +1,5 @@
 
-{-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings, DeriveGeneric, MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- | Internal module. Mostly for type definitions
 --   and class instances.
@@ -16,7 +16,7 @@ module Graphics.Web.Processing.Core.Primal (
   , true, false
   , pnot, (#||), (#&&)
   -- *** Int
-  , Proc_Int, fromInt, evalInt
+  , Proc_Int, fromInt
   , pfloor
   -- *** Float
   , Proc_Float (..), fromFloat
@@ -90,6 +90,26 @@ pfunction n as = fromText n <> parens (commasep as)
 
 -- TYPES
 
+class Extended from to | to -> from where
+ extend :: from -> to
+ patmatch :: to -> Maybe from
+
+extendf :: Extended from to
+        => (from -> from) -> (to -> to) -> (to -> to)
+extendf f g x =
+  case patmatch x of
+    Nothing -> g x
+    Just a  -> extend $ f a
+
+extendop :: Extended from to
+         => (from -> from -> from)
+         -> (to   -> to   -> to)
+         -> (to   -> to   -> to)
+extendop f g x y =
+  case (patmatch x, patmatch y) of
+    (Just a, Just b) -> extend $ f a b
+    _ -> g x y
+
 -- | Boolean values.
 data Proc_Bool =
    Proc_True
@@ -123,6 +143,14 @@ data Proc_Bool =
    | Char_NEq Proc_Char Proc_Char
      -- Text
    | Text_Eq Proc_Text Proc_Text
+     deriving Eq
+
+instance Extended Bool Proc_Bool where
+ extend True  = Proc_True 
+ extend False = Proc_False
+ patmatch Proc_True = Just True
+ patmatch Proc_False = Just False
+ patmatch _ = Nothing
 
 -- Doc helpers
 
@@ -183,24 +211,23 @@ false = Proc_False
 
 -- | Negation.
 pnot :: Proc_Bool -> Proc_Bool
-pnot = Proc_Neg
+pnot = extendf not Proc_Neg
 
 infixr 2 #||
 
 -- | Disjunction.
 (#||) :: Proc_Bool -> Proc_Bool -> Proc_Bool
-(#||) = Proc_Or
+(#||) = extendop (||) Proc_Or
 
 infixr 3 #&&
 
 -- | Conjunction.
 (#&&) :: Proc_Bool -> Proc_Bool -> Proc_Bool
-(#&&) = Proc_And
+(#&&) = extendop (&&) Proc_And
 
 -- | Cast a 'Bool' value.
 fromBool :: Bool -> Proc_Bool
-fromBool True  = Proc_True
-fromBool False = Proc_False
+fromBool = extend
 
 -- | Integer numbers.
 data Proc_Int =
@@ -218,6 +245,11 @@ data Proc_Int =
  | Int_Floor Proc_Float
    deriving Eq
 
+instance Extended Int Proc_Int where
+ extend = Proc_Int
+ patmatch (Proc_Int a) = Just a
+ patmatch _ = Nothing
+
 instance Pretty Proc_Int where
  ppr (Proc_Int i) = ppr i
  ppr (Int_Sum n m) = parens $ ppr n <> fromText "+" <> ppr m
@@ -231,56 +263,45 @@ instance Pretty Proc_Int where
 
 -- | Cast an 'Int' value.
 fromInt :: Int -> Proc_Int
-fromInt = Proc_Int
-
--- | Try to evaluate an integer.
-evalInt :: Proc_Int -> Maybe Int
-evalInt (Proc_Int i) = Just i
-evalInt (Int_Sum n m) = liftA2 (+) (evalInt n) (evalInt m)
-evalInt (Int_Substract n m) = liftA2 (-) (evalInt n) (evalInt m)
-evalInt (Int_Divide n m) = liftA2 div (evalInt n) (evalInt m)
-evalInt (Int_Mult n m) = liftA2 (*) (evalInt n) (evalInt m)
-evalInt (Int_Mod n m) = liftA2 mod (evalInt n) (evalInt m)
-evalInt (Int_Abs n) = fmap abs $ evalInt n
--- Variables cannot be evaluated.
-evalInt _ = Nothing
+fromInt = extend
 
 -- | Calculates the 'floor' of a 'Proc_Float'.
 pfloor :: Proc_Float -> Proc_Int
-pfloor = Int_Floor
+pfloor (Proc_Float x) = Proc_Int $ floor x
+pfloor x = Int_Floor x
 
 instance Ord Proc_Int where
- n <= m = case liftA2 (<=) (evalInt n) (evalInt m) of
+ n <= m = case liftA2 (<=) (patmatch n) (patmatch m) of
    Nothing -> error "Proc_Int: (<=) applied to a variable."
    Just b -> b
 
 instance Enum Proc_Int where
  toEnum = fromInt
- fromEnum n = case evalInt n of
+ fromEnum n = case patmatch n of
   Nothing -> error "Proc_Int: fromEnum applied to a variable."
   Just i -> i
  succ n = n + 1
  pred n = n - 1
- 
+
 -- | WARNING: 'signum' method is undefined.
 instance Num Proc_Int where
  fromInteger = fromInt . fromInteger
- (+) = Int_Sum
- (-) = Int_Substract
- (*) = Int_Mult
- abs = Int_Abs
+ (+) = extendop (+) Int_Sum
+ (-) = extendop (-) Int_Substract
+ (*) = extendop (*) Int_Mult
+ abs = extendf abs Int_Abs
  signum = error "Proc_Int: signum method is undefined."
 
 instance Real Proc_Int where
- toRational n = case evalInt n of
+ toRational n = case patmatch n of
    Nothing -> error "Proc_Int: toRational applied to a variable."
    Just i -> toRational i
 
 instance Integral Proc_Int where
- div = Int_Divide
- mod = Int_Mod
+ div = extendop div Int_Divide
+ mod = extendop mod Int_Mod
  divMod n d = (div n d, mod n d)
- toInteger n = case evalInt n of
+ toInteger n = case patmatch n of
    Nothing -> error "Proc_Int: toInteger applied to a variable."
    Just i  -> toInteger i
 
@@ -297,8 +318,6 @@ data Proc_Float =
  | Float_Mod Proc_Float Proc_Float
    -- Variables
  | Float_Var Text
-   -- Constants
- | Float_Pi
    -- Functions
  | Float_Abs Proc_Float
  | Float_Exp Proc_Float
@@ -316,6 +335,11 @@ data Proc_Float =
 
 instance Hashable Proc_Float
 
+instance Extended Float Proc_Float where
+ extend = Proc_Float
+ patmatch (Proc_Float x) = Just x
+ patmatch _ = Nothing
+
 instance Pretty Proc_Float where 
  ppr (Proc_Float f) = ppr f
  ppr (Float_Sum x y) = parens $ ppr x <> fromText "+" <> ppr y
@@ -324,7 +348,6 @@ instance Pretty Proc_Float where
  ppr (Float_Mult x y) = parens $ ppr x <> fromText "*" <> ppr y
  ppr (Float_Mod x y) = parens $ ppr x <> fromText "%" <> ppr y
  ppr (Float_Var t) = fromText t
- ppr Float_Pi = fromText "PI"
  ppr (Float_Abs x) = pfunction "abs" [ppr x]
  ppr (Float_Exp x) = pfunction "exp" [ppr x]
  ppr (Float_Sqrt x) = pfunction "sqrt" [ppr x]
@@ -339,7 +362,7 @@ instance Pretty Proc_Float where
 
 -- | Cast a 'Float' value.
 fromFloat :: Float -> Proc_Float
-fromFloat = Proc_Float
+fromFloat = extend
 
 -- | Specialized form of 'floor'.
 floorI :: Float -> Int
@@ -348,26 +371,6 @@ floorI = floor
 -- | Noise random function.
 noisef :: Proc_Float -> Proc_Float -> Proc_Float
 noisef = Float_Noise
-
-evalFloat :: Proc_Float -> Maybe Float
-evalFloat (Proc_Float f) = Just f
-evalFloat (Float_Sum x y) = liftA2 (+) (evalFloat x) (evalFloat y)
-evalFloat (Float_Substract x y) = liftA2 (-) (evalFloat x) (evalFloat y)
-evalFloat (Float_Divide x y) = liftA2 (/) (evalFloat x) (evalFloat y)
-evalFloat (Float_Mult x y) = liftA2 (*) (evalFloat x) (evalFloat y)
-evalFloat Float_Pi = Just pi
-evalFloat (Float_Abs x) = fmap abs $ evalFloat x
-evalFloat (Float_Exp x) = fmap exp $ evalFloat x
-evalFloat (Float_Sqrt x) = fmap sqrt $ evalFloat x
-evalFloat (Float_Log x) = fmap log $ evalFloat x
-evalFloat (Float_Sine x) = fmap sin $ evalFloat x
-evalFloat (Float_Cosine x) = fmap cos $ evalFloat x
-evalFloat (Float_Arcsine x) = fmap asin $ evalFloat x
-evalFloat (Float_Arccosine x) = fmap acos $ evalFloat x
-evalFloat (Float_Arctangent x) = fmap atan $ evalFloat x
-evalFloat (Float_Floor x) = fmap (fromIntegral . floorI) $ evalFloat x
---
-evalFloat _ = Nothing
 
 -- | Cast a 'Proc_Int' to a 'Proc_Float'.
 intToFloat :: Proc_Int -> Proc_Float
@@ -384,28 +387,28 @@ intToFloat (Int_Floor x) = Float_Floor x
 -- | WARNING: 'signum' method is undefined.
 instance Num Proc_Float where
  fromInteger = fromFloat . fromInteger
- (+) = Float_Sum
- (-) = Float_Substract
- (*) = Float_Mult
- abs = Float_Abs
+ (+) = extendop (+) Float_Sum
+ (-) = extendop (-) Float_Substract
+ (*) = extendop (*) Float_Mult
+ abs = extendf abs Float_Abs
  signum = error "Proc_Float: signum method is undefined."
 
 instance Fractional Proc_Float where
- (/) = Float_Divide
+ (/) = extendop (/) Float_Divide
  fromRational = fromFloat . fromRational
 
 -- | WARNING: 'sinh', 'cosh', 'asinh', 'acosh' and 'atanh'
 --   methods are undefined.
 instance Floating Proc_Float where
- pi = Float_Pi
- exp = Float_Exp
- sqrt = Float_Sqrt
- log = Float_Log
- sin = Float_Sine
- cos = Float_Cosine
- asin = Float_Arcsine
- acos = Float_Arccosine
- atan = Float_Arctangent
+ pi = extend pi
+ exp = extendf exp Float_Exp
+ sqrt = extendf sqrt Float_Sqrt
+ log = extendf log Float_Log
+ sin = extendf sin Float_Sine
+ cos = extendf cos Float_Cosine
+ asin = extendf asin Float_Arcsine
+ acos = extendf acos Float_Arccosine
+ atan = extendf atan Float_Arctangent
  -- UNDEFINED
  sinh = error "Proc_Float: sinh method is undefined."
  cosh = error "Proc_Float: cosh method is undefined."
@@ -414,7 +417,7 @@ instance Floating Proc_Float where
  atanh = error "Proc_Float: atanh method is undefined."
 
 -- | Type of images.
-data Proc_Image = Image_Var Text
+data Proc_Image = Image_Var Text deriving Eq
 
 instance Pretty Proc_Image where
  ppr (Image_Var t) = fromText t
@@ -423,10 +426,16 @@ instance Pretty Proc_Image where
 data Proc_Char =
    Proc_Char Char
  | Char_Var Text
+   deriving Eq
+
+instance Extended Char Proc_Char where
+ extend = Proc_Char
+ patmatch (Proc_Char c) = Just c
+ patmatch _ = Nothing
 
 -- | Cast a 'Char' value.
 fromChar :: Char -> Proc_Char
-fromChar = Proc_Char
+fromChar = extend
 
 instance Pretty Proc_Char where
  ppr (Proc_Char c) = enclose squote squote (char c)
@@ -436,6 +445,12 @@ instance Pretty Proc_Char where
 data Proc_Text =
    Proc_Text Text
  | Text_Var Text
+   deriving Eq
+
+instance Extended Text Proc_Text where
+ extend = Proc_Text
+ patmatch (Proc_Text t) = Just t
+ patmatch _ = Nothing
 
 instance Pretty Proc_Text where
  ppr (Proc_Text t) = enclose dquote dquote (fromText t)
@@ -443,7 +458,7 @@ instance Pretty Proc_Text where
 
 -- | Cast a strict 'Text' value.
 fromStText :: Text -> Proc_Text
-fromStText = Proc_Text
+fromStText = extend
 
 -- CODE
 
@@ -461,6 +476,7 @@ data ProcCode c =
               (ProcCode c) -- ELSE
  | Comment Text
  | Sequence (Seq.Seq (ProcCode c))
+   deriving Eq
 
 instance Pretty (ProcCode c) where
  ppr (Command n as) = pfunction n (fmap ppr as) <+> fromText ";"
@@ -527,6 +543,7 @@ data ProcArg =
  | ImageArg Proc_Image
  | TextArg  Proc_Text
  | CharArg  Proc_Char
+   deriving Eq
 
 instance Pretty ProcArg where
  ppr (BoolArg  b) = ppr b
@@ -544,6 +561,7 @@ data ProcAsign =
  | ImageAsign Text Proc_Image
  | TextAsign  Text Proc_Text
  | CharAsign  Text Proc_Char
+   deriving Eq
 
 instance Pretty ProcAsign where
  ppr (BoolAsign  n b) = fromText n <+> fromText "=" <+> ppr b
@@ -667,8 +685,16 @@ instance Proc_Ord Proc_Float where
 -- | Class of reducible types. Values of these
 --   types contain expressions that can be
 --   reducible.
-class Reducible a where
+class Eq a => Reducible a where
  reduce :: a -> a
+
+iteratedReduce :: Reducible a => a -> a
+iteratedReduce = fst . firstWith (uncurry (==)) . pairing . iterate reduce
+ where
+  pairing (x:y:xs) = (x,y) : pairing (y:xs)
+  pairing _ = []
+  firstWith f (x:xs) = if f x then x else firstWith f xs
+  firstWith _ _ = error "Error in iterated reduction. Report this as a bug."
 
 {-
 
@@ -681,109 +707,31 @@ The more we reduce, the more effective
 will be the Processing output code, since we save
 operations.
 
-Using the function 'evalFloat', we detect if
-a expression can be reduced to a single 'Float'
-value. If it is not possible, that means that it
-contains either a variable or a function which
-output we can't predict from the input (like 'noise').
-
-Any work here is always valuable. I am even thinking
-about creating a module only for this kind of stuff.
-This module is getting too big.
-
-The current reduction algorithm is really naïve and
-without any guarantees. However, it is already saving
-lot of operations.
-
 -}
 
 instance Reducible Proc_Float where
  reduce (Float_Sum x y) =
-   if x == y
-      then Float_Mult 2 x
-      else case (evalFloat x, evalFloat y) of
-            (Just a ,Just b ) -> Proc_Float $ a + b
-            (Nothing,Just b ) -> Float_Sum (reduce x) (Proc_Float b)
-            (Just a ,Nothing) -> Float_Sum (Proc_Float a) (reduce y)
-            (Nothing,Nothing) -> Float_Sum (reduce x) (reduce y)
+   if x == y then 2 * reduce x
+             else reduce x + reduce y
  reduce (Float_Substract x y) =
-   if x == y
-      then 0
-      else case (evalFloat x, evalFloat y) of
-            (Just a ,Just b ) -> Proc_Float $ a - b
-            (Nothing,Just b ) -> Float_Substract (reduce x) (Proc_Float b)
-            (Just a ,Nothing) -> Float_Substract (Proc_Float a) (reduce y)
-            (Nothing,Nothing) -> Float_Substract (reduce x) (reduce y)
+   if x == y then 0
+             else reduce x - reduce y
  reduce (Float_Mult x y) =
    if x == y
       -- x*x = x^2
-      then x**2
-      else case (evalFloat x, evalFloat y) of
-            (Just a ,Just b ) -> Proc_Float $ a * b
-            (Nothing,Just b ) -> Float_Mult (reduce x) (Proc_Float b)
-            (Just a ,Nothing) -> Float_Mult (Proc_Float a) (reduce y)
-            (Nothing,Nothing) -> Float_Mult (reduce x) (reduce y)
- reduce (Float_Divide (Float_Mult x y) z) =
-   case evalFloat (Float_Divide x z) of
-    -- (x*y)/z = y*(x/z)
-    Just a -> reduce $ Float_Mult y $ Proc_Float a
-    Nothing ->
-      case evalFloat (Float_Divide y z) of
-       -- (x*y)/z = x*(y/z)
-       Just a -> reduce $ Float_Mult x $ Proc_Float a
-       -- When both (x/z) and (y/z) contain a variable.
-       Nothing -> Float_Divide (reduce $ Float_Mult x y) $ reduce z
- reduce (Float_Divide x y) =
-   case (evalFloat x, evalFloat y) of
-    (Just a ,Just b ) -> Proc_Float $ a / b
-    (Nothing,Just b ) -> Float_Divide (reduce x) (Proc_Float b)
-    (Just a ,Nothing) -> Float_Divide (Proc_Float a) (reduce y)
-    (Nothing,Nothing) -> Float_Divide (reduce x) (reduce y)
- reduce (Float_Exp x) =
-   case evalFloat x of
-    Just a  -> Proc_Float $ exp a
-    Nothing -> Float_Exp $ reduce x
- reduce (Float_Abs x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ abs a
-    Nothing -> Float_Abs $ reduce x
- reduce (Float_Sqrt x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ sqrt a
-    Nothing -> Float_Sqrt $ reduce x
- reduce (Float_Log x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ log a
-    Nothing -> Float_Log $ reduce x
- reduce (Float_Sine x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ sin a
-    Nothing -> Float_Sine $ reduce x
- reduce (Float_Cosine x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ cos a
-    Nothing -> Float_Cosine $ reduce x
- reduce (Float_Arcsine x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ asin a
-    Nothing -> Float_Arcsine $ reduce x
- reduce (Float_Arccosine x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ acos a
-    Nothing -> Float_Arccosine $ reduce x
- reduce (Float_Arctangent x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ atan a
-    Nothing -> Float_Arctangent $ reduce x
- reduce (Float_Floor x) =
-    case evalFloat x of
-    Just a  -> Proc_Float $ (fromIntegral . floorI) a
-    Nothing -> Float_Floor $ reduce x
- reduce (Float_Noise x y) = Float_Noise (reduce x) (reduce y)
+      then reduce x ** 2
+      else reduce x * reduce y
+ -- (x*y)/z = y*(x/z)
+ reduce (Float_Divide (Float_Mult (Proc_Float x) y) (Proc_Float z)) =
+   reduce $ (y*) $ Proc_Float $ x / z
+ -- (x*y)/z = x*(y/z)
+ reduce (Float_Divide (Float_Mult x (Proc_Float y)) (Proc_Float z)) =
+   reduce $ (x*) $ Proc_Float $ y / z
+ reduce (Float_Divide x y) = reduce x / reduce y
  reduce x = x
 
 instance Reducible ProcArg where
- reduce (FloatArg x) = FloatArg $ reduce x
+ reduce (FloatArg x) = FloatArg $ iteratedReduce x
  reduce x = x
 
 instance Reducible (ProcCode c) where
