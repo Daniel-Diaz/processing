@@ -9,24 +9,65 @@
 -- > Circle (0,0) 10
 --
 --   The origin will be represented at the center of
---   the screen.
+--   the screen. As opposed to the other modules,
+--   /y/-coordinates increase to the top, while /x/-coordinates
+--   still increase to the right.
+--
+--   This is a red rectangle with top-left corner at the origin,
+--   10 points height and 10 points width:
+--
+-- > FillColor (Color 255 0 0 255) $ Rectangle (0,0) 10 10
+--
+--   To display several figures together, use the 'Monoid' instance:
+--
+-- > Circle (0,0) 10 <> Circle (0,20) 10
+--
+--   If you just want to display this figure in the target canvas,
+--   use 'displayFigure'. If you want to animate it, use 'animateFigure'.
+--   Animations depend on the number of frames since the beginning of
+--   the execution, instead of in the time spent.
+--
+--   Once you have created a processing script (a value of type
+--   'ProcScript'), use 'renderFile' to write it to a file. See
+--   also the "Graphics.Web.Processing.Html" module.
+--
+--   The default filling color and line color are white and black
+--   respectively. Use 'FillColor' and 'LineColor' to change these
+--   colors. 'Color's are in RGBA format, meaning that they may be
+--   transparent (with an alpha value of 0), opaque (with an alpha
+--   value of 255) or something in between. Use a fully transparent
+--   color to indicate that a Figure should not be filled.
+--
+--   You can apply transformations like translation, rotation and
+--   scaling. If @p@ is a point and @f@ a figure, @Translate p f@
+--   will draw @f@ with @p@ as the origin of coordinates. Rotations
+--   and scalings are always done in respect to the origin, but note
+--   that you can modify where the origin is using 'Translate'.
 module Graphics.Web.Processing.Simple (
      -- * Types
      module Graphics.Web.Processing.Core.Types
    , Color (..)
    , Proc_Point
    , Path
-     -- * Monoid
-   , module Data.Monoid
-     -- * Figures
+     -- * Figure type
    , Figure (..)
+     -- * Monoids
+     -- | A re-export of the "Data.Monoid" module is provided.
+     --   You may be using it to join different 'Figure's into one.
+   , module Data.Monoid
+     -- * Script
    , displayFigure
    , animateFigure
+     -- ** Interactive
+   , interactiveFigure
+     -- | Module re-export for convenience.
+   , module Graphics.Web.Processing.Mid.CustomVar
    ) where
 
 import Data.Monoid
 import Graphics.Web.Processing.Core.Types
 import Graphics.Web.Processing.Mid
+import Graphics.Web.Processing.Mid.CustomVar
 -- state
 import Control.Applicative ((<$>))
 import Control.Monad.Trans.State
@@ -172,3 +213,44 @@ animateFigure mw mh fr bgc f = execScriptM $ do
      background bgc
      translate (intToFloat w/2) (intToFloat h/2)
      frameCount >>= figureEvent . f
+
+-- | Framework to create interactive scripts.
+--
+--   Note that is required for the state to be an instance of 'CustomValue'.
+--   More info on how to instantiate a type in the 'CustomValue' class in the
+--   "Graphics.Web.Processing.Mid.CustomVar" module.
+interactiveFigure :: CustomValue w
+  => Maybe Int -- ^ Width (if none, takes as much as is available).
+  -> Maybe Int -- ^ Height (if none, takes as much as is available).
+  -> Int -- ^ Frame rate.
+  -> w -- ^ Initial state.
+  -> (w -> Figure) -- ^ How to print the state.
+  -> (w -> Color) -- ^ Background color, depending on the current state.
+  -> (Proc_Int -> w -> w) -- ^ Function to step the world one iteration.
+                          --   It is passed the number of frames from the
+                          --   beginning.
+  -> (Proc_Point -> w -> w) -- ^ Function called each time the mouse is clicked.
+  -> ProcScript
+interactiveFigure mw mh framerate s0 _print bg step onclick = execScriptM $ do
+  let w = maybe screenWidth  fromInt mw
+      h = maybe screenHeight fromInt mh
+  v <- newVarC s0
+  on Setup $ do
+     setFrameRate $ fromInt framerate
+  on Draw $ do
+     size w h
+     writeComment "Read state"
+     s <- readVarC v
+     writeComment "Background color"
+     background $ bg s
+     writeComment "Draw state"
+     figureEvent $ _print s
+     writeComment $ "Update state"
+     n <- frameCount
+     writeVarC v $ step n s
+  on MouseClicked $ do
+     writeComment "Read state"
+     s <- readVarC v
+     writeComment "Mouse event"
+     p <- getMousePoint
+     writeVarC v $ onclick p s

@@ -1,7 +1,9 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Code optimization module.
 module Graphics.Web.Processing.Optimize (
+   -- * Optimizations
    optimizeBySubstitution
    ) where
 
@@ -253,6 +255,10 @@ runSubstitution n m = (substitutionIndex s, codeWritten s)
 subsOptimize :: Int -> ProcCode c -> (Int,ProcCode c)
 subsOptimize n c = runSubstitution n $ codeSubstitution c >> applySubstitution
 
+-- | Optimization by substitution. It looks for commonly repeated operations and
+--   create variables for them so they are only calculated once.
+--
+--   This optimization is applied automatically when using 'execScriptM'.
 optimizeBySubstitution :: ProcScript -> ProcScript
 optimizeBySubstitution
   (ProcScript _preamble

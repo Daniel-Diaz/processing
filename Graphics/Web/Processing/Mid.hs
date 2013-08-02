@@ -5,7 +5,9 @@
 --   less predictable, since it does some tricks in order to obtain
 --   semantics that are more coherent with Haskell. The difference is
 --   small, but let's say that this module has more freedom writing
---   the output code.
+--   the output code. It also applies code optimizations, so the output
+--   code may look different (see 'execScriptM' and
+--   "Graphics.Web.Processing.Optimize").
 --
 --   /How to work with it?/
 --
@@ -207,6 +209,9 @@ on c (EventM e) = ScriptM $ modify $ \ss ->
 
 -- | Execute the scripter monad to get the full Processing script.
 --   Use 'renderScript' or 'renderFile' to render it.
+--
+--   After generating the script, the output code is optimized
+--   using 'optimizeBySubstitution'.
 execScriptM :: ScriptM Preamble () -> ProcScript
 execScriptM (ScriptM s0) =
   let s = execState s0 emptyScriptState

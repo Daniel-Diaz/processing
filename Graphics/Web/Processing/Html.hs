@@ -10,6 +10,10 @@
 -- > <script src="processing.js"></script>
 --
 --   See 'importScript'.
+--
+--   /Note from the author: I didn't manage to run a processing animation locally,/
+--   /so you may have the same issue. Once I uploaded them to my server, they worked/
+--   /just fine./
 module Graphics.Web.Processing.Html (
     procCanvas
   , importScript

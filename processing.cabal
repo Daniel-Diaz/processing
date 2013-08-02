@@ -31,6 +31,25 @@ Description:
   The API reference of the library includes guidance and is complemented with
   code examples. Look also to the /examples/ directory included in the source
   distribution. It contains some fully working examples.
+  .
+  The library provides different APIs (interfaces). Each one with a different
+  philosophy.
+  .
+  * /Simple/ ("Graphics.Web.Processing.Simple"): An abstract interface, focusing
+  in what you want to be displayed, but not how. The library will know how to
+  write the processing code you need. However, you may lack some features that
+  you can find in other interfaces.
+  .
+  * /Mid/ ("Graphics.Web.Processing.Mid"): More imperative feeling, with variables
+  and commands. But also convenient and complete. This is the default interface,
+  re-exported by "Graphics.Web.Processing".
+  .
+  * /Basic/ ("Graphics.Web.Processing.Basic"): For people that like to do things
+  by hand. The output processing code is predictable and you have great
+  control over it.
+  .
+  The module "Graphics.Web.Processing.Html" helps you to create the HTML document
+  where you will display the animation.
 Cabal-version: >= 1.6
 Extra-source-files:
   readme.md

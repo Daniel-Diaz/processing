@@ -62,6 +62,7 @@ import Prelude hiding (foldr)
 import Data.Text (Text,lines)
 import qualified Data.Sequence as Seq
 import Data.Monoid
+import Data.String
 import Data.Foldable (foldMap,foldr)
 import Control.Applicative (liftA2)
 -- Pretty
@@ -472,6 +473,9 @@ instance Pretty Proc_Text where
 -- | Cast a strict 'Text' value.
 fromStText :: Text -> Proc_Text
 fromStText = extend
+
+instance IsString Proc_Text where
+ fromString = fromStText . fromString
 
 -- CODE
 
