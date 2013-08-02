@@ -92,10 +92,13 @@ noise (x,y) = return $ noisef x y
 -- * 'Setup'
 --
 -- * 'Draw'
+--
+-- * 'MouseClicked'
 class Drawing a where
 
 instance Drawing Setup where
 instance Drawing Draw where
+instance Drawing MouseClicked where
 
 ------ COLORS
 
