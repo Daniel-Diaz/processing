@@ -77,7 +77,6 @@ Library
     Graphics.Web.Processing.Core.Var
     -- Basic interface
     Graphics.Web.Processing.Basic
-    Graphics.Web.Processing.Basic.Baked
     -- Mid interface
     Graphics.Web.Processing.Mid
     Graphics.Web.Processing.Mid.CustomVar
