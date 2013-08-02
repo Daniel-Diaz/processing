@@ -75,4 +75,9 @@ Library
   Extensions: OverloadedStrings
             , EmptyDataDecls
             , DeriveGeneric
+            , MultiParamTypeClasses
+            , FunctionalDependencies
+            , TypeOperators
+            , DefaultSignatures
+            , FlexibleContexts
   GHC-Options: -Wall
