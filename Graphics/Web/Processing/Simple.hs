@@ -79,21 +79,46 @@ type Path = [Proc_Point]
 -- | The monoid of plane figures.
 data Figure =
    Line Path
+   -- ^ Line joining a list of points.
  | Polygon Path
+   -- ^ Polygon given a list of vertex.
  | Ellipse Proc_Point Proc_Float Proc_Float
+   -- ^ Ellipse centered at the given point,
+   --   with width and height also specified.
  | Circle Proc_Point Proc_Float
+   -- ^ Circle centered at the given point and with
+   --   the specified radius.
  | Arc Proc_Point Proc_Float Proc_Float
                   Proc_Float Proc_Float
+   -- ^ Arc. The arc is drawn following the line of
+   --   an ellipse between two angles.
+   --   The first argument is the center of the ellipse.
+   --   The next two arguments are the width and height of
+   --   the ellipse.
+   --   The last two arguments are the initial and end
+   --   angles of the arc.
  | Rectangle Proc_Point Proc_Float Proc_Float
+   -- ^ Rectangle such that the top-left corner is
+   --   at the specified point, and its width and
+   --   height are specified by the other two arguments.
  | Bezier Proc_Point Proc_Point Proc_Point Proc_Point
+   -- ^ Bezier curve. First and last arguments are the initial
+   --   and end points of the curve. The other points are
+   --   control points.
  | Text Proc_Point Proc_Text
+   -- ^ Text.
  | LineColor Color Figure
+   -- ^ Set the line color of a figure.
  | FillColor Color Figure
+   -- ^ Set the filling color of a figure.
  | Translate Proc_Point Figure
    -- ^ Translate a figure in the direction of a vector.
  | Rotate Proc_Float Figure
+   -- ^ Rotate a figure by the given angle in radians.
  | Scale Proc_Float Proc_Float Figure
+   -- ^ Scale a figure by the given x and y factors.
  | Figures [Figure]
+   -- ^ List of figures.
 
 instance Monoid Figure where
  mempty = Figures []

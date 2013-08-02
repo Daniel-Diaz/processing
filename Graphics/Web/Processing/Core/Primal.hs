@@ -9,7 +9,7 @@ module Graphics.Web.Processing.Core.Primal (
   -- | A list of singleton types, used to restrict the
   --   use of certain commands to specific contexts.
     Preamble (..), Setup (..), Draw (..)
-  , MouseClicked (..)
+  , MouseClicked (..), MouseReleased (..)
   -- ** Processing types
   -- *** Boolean
   , Proc_Bool, fromBool
@@ -81,6 +81,9 @@ data Draw = Draw
 
 -- | Code that is executed when the mouse is clicked.
 data MouseClicked = MouseClicked
+
+-- | Code that is executed when the mouse is released.
+data MouseReleased = MouseReleased
 
 -- PRETTY-HELPERS
 
@@ -805,6 +808,7 @@ data ProcScript = ProcScript
  , proc_setup :: ProcCode Setup
  , proc_draw  :: Maybe (ProcCode Draw)
  , proc_mouseClicked :: Maybe (ProcCode MouseClicked)
+ , proc_mouseReleased :: Maybe (ProcCode MouseReleased)
    }
 
 -- | Empty script.
@@ -814,6 +818,7 @@ emptyScript = ProcScript {
  , proc_setup = emptyCode
  , proc_draw = Nothing
  , proc_mouseClicked = Nothing
+ , proc_mouseReleased = Nothing
    }
 
 pvoid :: Pretty a => Text -> Maybe a -> Doc
@@ -828,4 +833,5 @@ instance Pretty ProcScript where
    , pvoid "setup" $ Just $ proc_setup ps
    , pvoid "draw" $ proc_draw ps
    , pvoid "mouseClicked" $ proc_mouseClicked ps
+   , pvoid "mouseReleased" $ proc_mouseReleased ps
      ]

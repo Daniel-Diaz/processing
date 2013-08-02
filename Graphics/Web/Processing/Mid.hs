@@ -136,10 +136,11 @@ data ScriptState c =
     , script_setup :: Maybe (ProcM Setup ())
     , script_draw :: Maybe (ProcM Draw ())
     , script_mouseClicked :: Maybe (ProcM MouseClicked ())
+    , script_mouseReleased :: Maybe (ProcM MouseReleased ())
       }
 
 emptyScriptState :: ScriptState c
-emptyScriptState = ScriptState (return ()) Nothing Nothing Nothing
+emptyScriptState = ScriptState (return ()) Nothing Nothing Nothing Nothing
 
 -- | Scripter monad. This monad is where Processing code is written.
 --   Because of some implementation details, 'ScriptM' has a context @c@.
@@ -176,6 +177,7 @@ instance ProcMonad ScriptM where
                      (f script_setup)
                      (f script_draw)
                      (f script_mouseClicked)
+                     (f script_mouseReleased)
 
 -- | Context of an event. The context determines which functions can be used.
 --   'Preamble' is not an instance of 'Context' to avoid using 'Preamble' as
@@ -191,6 +193,9 @@ instance Context Draw where
 
 instance Context MouseClicked where
  addEvent _ c s = s { script_mouseClicked = Just c }
+
+instance Context MouseReleased where
+ addEvent _ c s = s { script_mouseReleased = Just c }
 
 -- | Set an event. Different events are specified by the instances of the
 --   'Context' class.
@@ -220,6 +225,7 @@ execScriptM (ScriptM s0) =
     , proc_setup = maybe mempty execProcM $ script_setup s
     , proc_draw = fmap execProcM $ script_draw s
     , proc_mouseClicked = fmap execProcM $ script_mouseClicked s
+    , proc_mouseReleased = fmap execProcM $ script_mouseReleased s
       }
 
 -- Variables

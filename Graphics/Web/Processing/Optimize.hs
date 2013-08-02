@@ -264,15 +264,19 @@ optimizeBySubstitution
   (ProcScript _preamble
               _setup
               _draw
-              _mouseClicked)
-  = let (n1,_setup')        = subsOptimize 1 _setup
-        (n2,_draw')         = maybe (n1,Nothing) (second Just . subsOptimize n1) _draw
-        (n3,_mouseClicked') = maybe (n2,Nothing) (second Just . subsOptimize n2) _mouseClicked
-        vs = fmap (\n -> CreateVar $ FloatAsign (optVarName n) 0) [1 .. n3 - 1]
+              _mouseClicked
+              _mouseReleased
+               )
+  = let (n1,_setup')         = subsOptimize 1 _setup
+        (n2,_draw')          = maybe (n1,Nothing) (second Just . subsOptimize n1) _draw
+        (n3,_mouseClicked')  = maybe (n2,Nothing) (second Just . subsOptimize n2) _mouseClicked
+        (n4,_mouseReleased') = maybe (n3,Nothing) (second Just . subsOptimize n3) _mouseReleased
+        vs = fmap (\n -> CreateVar $ FloatAsign (optVarName n) 0) [1 .. n4 - 1]
     in ProcScript (_preamble <> subsComment (mconcat vs))
                    _setup'
                    _draw'
                    _mouseClicked'
+                   _mouseReleased'
 
 subsComment :: ProcCode Preamble -> ProcCode Preamble
 subsComment c =
