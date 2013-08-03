@@ -70,6 +70,7 @@ Library
     , mainland-pretty
     , blaze-html
     , multiset
+    , ghc-prim
   Exposed-modules:
     -- Core modules
     Graphics.Web.Processing.Core.Types
