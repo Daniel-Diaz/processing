@@ -1,5 +1,5 @@
 Name: processing
-Version: 1.0.0.0
+Version: 1.0.0.1
 Author: Daniel Díaz
 Category: Graphics
 Build-type: Simple
@@ -70,6 +70,9 @@ Library
     , mainland-pretty
     , blaze-html
     , multiset
+  -- Compatibility with previous GHC versions.
+  if impl(ghc < 7.6)
+     Build-depends: ghc-prim
   Exposed-modules:
     -- Core modules
     Graphics.Web.Processing.Core.Types
