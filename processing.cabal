@@ -93,10 +93,10 @@ Library
     Graphics.Web.Processing.Core.Monad
   Extensions: OverloadedStrings
             , EmptyDataDecls
-            , DeriveGeneric
+            -- , DeriveGeneric
             , MultiParamTypeClasses
             , FunctionalDependencies
             , TypeOperators
-            , DefaultSignatures
+            -- , DefaultSignatures
             , FlexibleContexts
   GHC-Options: -Wall
