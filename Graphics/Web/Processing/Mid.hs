@@ -122,8 +122,10 @@ instance ProcMonad EventM where
  assignM = addCode . assignM
  writeComment = addCode . writeComment
  iff b (EventM e1) (EventM e2) = do
-   let s1 = execState e1 emptyEventState
-       s2 = execState e2 emptyEventState
+   n0 <- liftProc getVarNumber
+   let s1 = execState e1 $ emptyEventState { event_code = setVarNumber n0 }
+       n1 = fst $ runProcMWith n0 $ event_code s1 >> getVarNumber
+       s2 = execState e2 $ EventState { event_preamble = return () , event_code = setVarNumber n1 }
    addPCode $ event_preamble s1
    addPCode $ event_preamble s2
    addCode $ iff b (event_code s1) (event_code s2)
