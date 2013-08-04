@@ -10,7 +10,8 @@ module Graphics.Web.Processing.Core.Primal (
   --   use of certain commands to specific contexts.
     Preamble (..), Setup (..), Draw (..)
   , MouseClicked (..), MouseReleased (..)
-  -- ** Processing types
+  , KeyPressed (..)
+  -- ** @Proc_*@ types
   -- *** Boolean
   , Proc_Bool, fromBool
   , true, false
@@ -29,6 +30,9 @@ module Graphics.Web.Processing.Core.Primal (
   , Proc_Char , fromChar
   -- *** Text
   , Proc_Text, fromStText
+  -- *** Keys
+  , Proc_Key (..)
+  , Proc_KeyCode (..)
   -- ** Type class of proc types
   , ProcType (..)
   -- ** Conditionals
@@ -84,6 +88,9 @@ data MouseClicked = MouseClicked
 
 -- | Code that is executed when the mouse is released.
 data MouseReleased = MouseReleased
+
+-- | Code executed when a key is pressed.
+data KeyPressed = KeyPressed
 
 -- PRETTY-HELPERS
 
@@ -145,6 +152,9 @@ data Proc_Bool =
    | Char_NEq Proc_Char Proc_Char
      -- Text
    | Text_Eq Proc_Text Proc_Text
+     -- Key
+   | Key_Eq Proc_Key Proc_Key
+   | KeyCode_Eq Proc_KeyCode Proc_KeyCode
      deriving Eq
 
 instance Extended Bool Proc_Bool where
@@ -202,6 +212,8 @@ instance Pretty Proc_Bool where
  ppr (Char_Eq x y) = parens $ ppr x <+> docEq <+> ppr y
  ppr (Char_NEq x y) = parens $ ppr x <+> docNEq <+> ppr y
  ppr (Text_Eq x y) = ppr x <> fromText "." <> pfunction "equals" [ppr y]
+ ppr (Key_Eq x y) = parens $ ppr x <+> docEq <+> ppr y
+ ppr (KeyCode_Eq x y) = parens $ ppr x <+> docEq <+> ppr y
 
 -- | Value of 'True'.
 true :: Proc_Bool
@@ -480,6 +492,52 @@ fromStText = extend
 instance IsString Proc_Text where
  fromString = fromStText . fromString
 
+-- | Type of keyboard keys.
+data Proc_Key =
+   Key_Var
+ | Key_CODED
+ | Key_Char Char
+   deriving Eq
+
+instance Pretty Proc_Key where
+ ppr Key_Var = fromText "key"
+ ppr Key_CODED = fromText "CODED"
+ ppr (Key_Char c) = ppr $ fromChar c
+
+-- | Type of keyboard key codes.
+data Proc_KeyCode =
+   KeyCode_Var
+ | KeyCode_UP
+ | KeyCode_DOWN
+ | KeyCode_LEFT
+ | KeyCode_RIGHT
+ | KeyCode_ALT
+ | KeyCode_CONTROL
+ | KeyCode_SHIFT
+ | KeyCode_BACKSPACE
+ | KeyCode_TAB
+ | KeyCode_ENTER
+ | KeyCode_RETURN
+ | KeyCode_ESC
+ | KeyCode_DELETE
+   deriving Eq
+
+instance Pretty Proc_KeyCode where
+ ppr KeyCode_Var = fromText "keyCode"
+ ppr KeyCode_UP = fromText "UP"
+ ppr KeyCode_DOWN = fromText "DOWN"
+ ppr KeyCode_LEFT = fromText "LEFT"
+ ppr KeyCode_RIGHT = fromText "RIGHT"
+ ppr KeyCode_ALT = fromText "ALT"
+ ppr KeyCode_CONTROL = fromText "CONTROL"
+ ppr KeyCode_SHIFT = fromText "SHIFT"
+ ppr KeyCode_BACKSPACE = fromText "BACKSPACE"
+ ppr KeyCode_TAB = fromText "TAB"
+ ppr KeyCode_ENTER = fromText "ENTER"
+ ppr KeyCode_RETURN = fromText "RETURN"
+ ppr KeyCode_ESC = fromText "ESC"
+ ppr KeyCode_DELETE = fromText "DELETE"
+
 -- CODE
 
 -- | A piece of Processing code.
@@ -681,6 +739,12 @@ instance Proc_Eq Proc_Char where
 instance Proc_Eq Proc_Text where
  (#==) = Text_Eq
 
+instance Proc_Eq Proc_Key where
+ (#==) = Key_Eq
+
+instance Proc_Eq Proc_KeyCode where
+ (#==) = KeyCode_Eq
+
 infix 4 #<=, #<, #>=, #>
 
 -- | 'Ord' class for @Proc_*@ values.
@@ -809,6 +873,7 @@ data ProcScript = ProcScript
  , proc_draw  :: Maybe (ProcCode Draw)
  , proc_mouseClicked :: Maybe (ProcCode MouseClicked)
  , proc_mouseReleased :: Maybe (ProcCode MouseReleased)
+ , proc_keyPressed :: Maybe (ProcCode KeyPressed)
    }
 
 -- | Empty script.
@@ -819,6 +884,7 @@ emptyScript = ProcScript {
  , proc_draw = Nothing
  , proc_mouseClicked = Nothing
  , proc_mouseReleased = Nothing
+ , proc_keyPressed = Nothing
    }
 
 pvoid :: Pretty a => Text -> Maybe a -> Doc
@@ -834,4 +900,5 @@ instance Pretty ProcScript where
    , pvoid "draw" $ proc_draw ps
    , pvoid "mouseClicked" $ proc_mouseClicked ps
    , pvoid "mouseReleased" $ proc_mouseReleased ps
+   , pvoid "keyPressed" $ proc_keyPressed ps
      ]

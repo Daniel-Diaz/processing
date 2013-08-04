@@ -266,17 +266,20 @@ optimizeBySubstitution
               _draw
               _mouseClicked
               _mouseReleased
+              _keyPressed
                )
   = let (n1,_setup')         = subsOptimize 1 _setup
         (n2,_draw')          = maybe (n1,Nothing) (second Just . subsOptimize n1) _draw
         (n3,_mouseClicked')  = maybe (n2,Nothing) (second Just . subsOptimize n2) _mouseClicked
         (n4,_mouseReleased') = maybe (n3,Nothing) (second Just . subsOptimize n3) _mouseReleased
-        vs = fmap (\n -> CreateVar $ FloatAsign (optVarName n) 0) [1 .. n4 - 1]
+        (n5,_keyPressed')    = maybe (n4,Nothing) (second Just . subsOptimize n4) _keyPressed
+        vs = fmap (\n -> CreateVar $ FloatAsign (optVarName n) 0) [1 .. n5 - 1]
     in ProcScript (_preamble <> subsComment (mconcat vs))
                    _setup'
                    _draw'
                    _mouseClicked'
                    _mouseReleased'
+                   _keyPressed'
 
 subsComment :: ProcCode Preamble -> ProcCode Preamble
 subsComment c =

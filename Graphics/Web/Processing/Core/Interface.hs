@@ -46,6 +46,7 @@ module Graphics.Web.Processing.Core.Interface (
    , ArrowKey (..)
    , KeyModifier (..)
    , SpecialKey (..)
+   , matchKey
    -- * Conditionals
    , iff
    -- * Others
@@ -59,7 +60,9 @@ module Graphics.Web.Processing.Core.Interface (
 -- Internal
 import Graphics.Web.Processing.Core.Primal
 import Graphics.Web.Processing.Core.Monad
-import Graphics.Web.Processing.Core.Var (readVar)
+import Graphics.Web.Processing.Core.Var (writeVar,readVar)
+--
+import Control.Arrow (first)
 
 ---- PREDEFINED VALUES
 
@@ -297,22 +300,61 @@ getMousePoint = do
 
 ---- KEYBOARD
 
+-- | Keyboard keys recognized by Processing.
 data Key =
     CharKey Char
-  | ArrowKey ArrowKey
   | SpecialKey SpecialKey
+  | ArrowKey ArrowKey
   | ModKey KeyModifier Key
 
+-- | Arrow keys.
 data ArrowKey = UP | DOWN | LEFT | RIGHT
 
+-- | Key modifiers.
 data KeyModifier = ALT | CONTROL | SHIFT
 
+-- | Special keys.
 data SpecialKey =
     BACKSPACE
   | TAB
   | ENTER
   | RETURN
   | ESC
+
+--                      CODED                   UNCODED
+keySplit :: Key -> ([Proc_KeyCode],Maybe (Either Proc_Key Proc_KeyCode))
+keySplit (CharKey c) = ([],Just $ Left $ Key_Char c)
+keySplit (SpecialKey BACKSPACE) = ([],Just $ Right $ KeyCode_BACKSPACE)
+keySplit (SpecialKey TAB) = ([],Just $ Right $ KeyCode_TAB)
+keySplit (SpecialKey ENTER) = ([],Just $ Right $ KeyCode_ENTER)
+keySplit (SpecialKey RETURN) = ([],Just $ Right $ KeyCode_RETURN)
+keySplit (SpecialKey ESC) = ([],Just $ Right $ KeyCode_ESC)
+keySplit (ArrowKey UP) = ([KeyCode_UP], Nothing)
+keySplit (ArrowKey DOWN) = ([KeyCode_DOWN], Nothing)
+keySplit (ArrowKey LEFT) = ([KeyCode_LEFT], Nothing)
+keySplit (ArrowKey RIGHT) = ([KeyCode_RIGHT], Nothing)
+keySplit (ModKey m k) =
+  let modToKeyCode :: KeyModifier -> Proc_KeyCode
+      modToKeyCode ALT = KeyCode_ALT
+      modToKeyCode CONTROL = KeyCode_CONTROL
+      modToKeyCode SHIFT = KeyCode_SHIFT
+  in  first (modToKeyCode m:) $ keySplit k
+
+-- | This function takes a variable of type 'Proc_Bool' and a 'Key', and sets the variable to
+--   'true' if the key pressed is the given 'Key'. Otherwise, the variable is set to 'false'.
+matchKey :: (ProcMonad m, Monad (m KeyPressed)) => Var Proc_Bool -> Key -> m KeyPressed ()
+matchKey v k = do
+  let (codedKeys,uncodedKey) = keySplit k
+  if null codedKeys
+     then return ()
+     else iff (Key_Var #== Key_CODED)
+              (writeVar v $ foldr1 (#&&) $ fmap (KeyCode_Var #==) codedKeys)
+              (writeVar v false)
+  b <- readVar v
+  case uncodedKey of
+    Nothing -> return ()
+    Just (Left  pk) -> writeVar v $ Key_Var     #== pk #&& b
+    Just (Right ck) -> writeVar v $ KeyCode_Var #== ck #&& b
 
 ---- SETUP
 
