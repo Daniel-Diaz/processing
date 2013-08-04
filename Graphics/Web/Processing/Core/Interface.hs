@@ -41,6 +41,11 @@ module Graphics.Web.Processing.Core.Interface (
    , resetMatrix
    -- * Mouse
    , getMousePoint
+   -- * Keyboard
+   , Key (..)
+   , ArrowKey (..)
+   , KeyModifier (..)
+   , SpecialKey (..)
    -- * Conditionals
    , iff
    -- * Others
@@ -289,6 +294,25 @@ getMousePoint = do
  x <- readVar $ varFromText "mouseX"
  y <- readVar $ varFromText "mouseY"
  return (x,y)
+
+---- KEYBOARD
+
+data Key =
+    CharKey Char
+  | ArrowKey ArrowKey
+  | SpecialKey SpecialKey
+  | ModKey KeyModifier Key
+
+data ArrowKey = UP | DOWN | LEFT | RIGHT
+
+data KeyModifier = ALT | CONTROL | SHIFT
+
+data SpecialKey =
+    BACKSPACE
+  | TAB
+  | ENTER
+  | RETURN
+  | ESC
 
 ---- SETUP
 
