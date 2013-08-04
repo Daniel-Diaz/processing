@@ -21,6 +21,18 @@ import Data.Text (Text)
 import Control.Applicative ((<$>))
 import Control.Arrow (second)
 
+boolops :: Proc_Bool -> Int
+boolops (Proc_Neg x) = 1 + boolops x
+boolops (Proc_Or x y) = 1 + boolops x + boolops y
+boolops (Proc_And x y) = 1 + boolops x + boolops y
+boolops (Float_Eq x y) = 1 + numOps x + numOps y
+boolops (Float_NEq x y) = 1 + numOps x + numOps y
+boolops (Float_LE x y) = 1 + numOps x + numOps y
+boolops (Float_L x y) = 1 + numOps x + numOps y
+boolops (Float_GE x y) = 1 + numOps x + numOps y
+boolops (Float_G x y) = 1 + numOps x + numOps y
+boolops _ = 0
+
 -- | Number of operations needed to calculate the
 --   value of a given 'Proc_Float' value.
 numOps :: Proc_Float -> Int
@@ -43,7 +55,7 @@ numOps (Float_Arccosine x) = 1 + numOps x
 numOps (Float_Arctangent x) = 1 + numOps x
 numOps (Float_Floor x) = 1 + numOps x
 numOps (Float_Noise x y) = 1 + numOps x + numOps y
-numOps (Float_Cond _ x y) = max (numOps x) (numOps y)
+numOps (Float_Cond b x y) = boolops b + max (numOps x) (numOps y)
 
 -----------------------------------------------------
 -----------------------------------------------------

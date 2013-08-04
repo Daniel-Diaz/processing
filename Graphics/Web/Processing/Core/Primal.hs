@@ -13,7 +13,7 @@ module Graphics.Web.Processing.Core.Primal (
   , KeyPressed (..)
   -- ** @Proc_*@ types
   -- *** Boolean
-  , Proc_Bool, fromBool
+  , Proc_Bool (..), fromBool
   , true, false
   , pnot, (#||), (#&&)
   -- *** Int
