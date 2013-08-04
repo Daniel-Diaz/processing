@@ -41,6 +41,8 @@ module Graphics.Web.Processing.Core.Types (
   -- * Processing classes
   , Proc_Eq (..)
   , Proc_Ord (..)
+  -- * Conditional values
+  , if_
   ) where
 
 import Graphics.Web.Processing.Core.Primal
@@ -59,3 +61,7 @@ renderScript = prettyLazyText charsPerLine . ppr
 --   write it directly in a file.
 renderFile :: FilePath -> ProcScript -> IO ()
 renderFile fp = T.writeFile fp . renderScript
+
+-- | Conditional value.
+if_ :: ProcType a => Proc_Bool -> a -> a -> a
+if_ = proc_cond

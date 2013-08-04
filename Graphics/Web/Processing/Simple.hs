@@ -60,6 +60,12 @@ module Graphics.Web.Processing.Simple (
    , animateFigure
      -- ** Interactive
    , interactiveFigure
+     -- *** Keyboard
+   , Key (..)
+   , ArrowKey (..)
+   , KeyModifier (..)
+   , SpecialKey (..)
+     -- *** Custom values
      -- | Module re-export for convenience.
    , module Graphics.Web.Processing.Mid.CustomVar
    ) where
@@ -255,15 +261,20 @@ interactiveFigure :: CustomValue w
                           --   It is passed the number of frames from the
                           --   beginning.
   -> (Proc_Point -> w -> w) -- ^ Function called each time the mouse is clicked.
+  -> [(Key,w -> w)] -- ^ Key events. List of pairs, where the first component is
+                    --   a 'Key' and the second component is the reaction to that
+                    --   'Key'.
   -> ProcScript
-interactiveFigure mw mh framerate s0 _print bg step onclick = execScriptM $ do
+interactiveFigure mw mh framerate s0 _print bg step onclick keyevents = execScriptM $ do
   let w = maybe screenWidth  fromInt mw
       h = maybe screenHeight fromInt mh
   v <- newVarC s0
+  keyv <- newVar true
   on Setup $ do
      setFrameRate $ fromInt framerate
   on Draw $ do
      size w h
+     translate (intToFloat w/2) (intToFloat h/2)
      writeComment "Read state"
      s <- readVarC v
      writeComment "Background color"
@@ -279,3 +290,13 @@ interactiveFigure mw mh framerate s0 _print bg step onclick = execScriptM $ do
      writeComment "Mouse event"
      p <- getMousePoint
      writeVarC v $ onclick p s
+  on KeyPressed $ mapM_ (keyEvent v keyv) keyevents
+
+keyEvent :: CustomValue w
+         => CustomVar w -> Var Proc_Bool -> (Key,w -> w) -> EventM KeyPressed ()
+keyEvent v keyv (k,f) = do
+  matchKey keyv k
+  b <- readVar keyv
+  iff b (readVarC v >>= writeVarC v . f)
+        (return ())
+  writeVar keyv true

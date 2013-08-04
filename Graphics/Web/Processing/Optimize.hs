@@ -43,6 +43,7 @@ numOps (Float_Arccosine x) = 1 + numOps x
 numOps (Float_Arctangent x) = 1 + numOps x
 numOps (Float_Floor x) = 1 + numOps x
 numOps (Float_Noise x y) = 1 + numOps x + numOps y
+numOps (Float_Cond _ x y) = max (numOps x) (numOps y)
 
 -----------------------------------------------------
 -----------------------------------------------------
@@ -100,6 +101,7 @@ browseFloat f@(Float_Arccosine x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Arctangent x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Floor x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Noise x y) = addFloat f >> browseFloat x >> browseFloat y
+browseFloat f@(Float_Cond _ x y) = addFloat f >> browseFloat x >> browseFloat y
 browseFloat _ = return ()
 
 execCounter :: FloatCounter a -> FloatSet

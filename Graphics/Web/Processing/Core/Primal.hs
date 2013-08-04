@@ -155,7 +155,9 @@ data Proc_Bool =
      -- Key
    | Key_Eq Proc_Key Proc_Key
    | KeyCode_Eq Proc_KeyCode Proc_KeyCode
-     deriving Eq
+   -- Conditional
+ | Bool_Cond Proc_Bool Proc_Bool Proc_Bool
+     deriving (Eq,Ord)
 
 instance Extended Bool Proc_Bool where
  extend True  = Proc_True 
@@ -183,6 +185,9 @@ docGE = fromText ">="
 
 docG :: Doc
 docG = fromText ">"
+
+docCond :: Doc -> Doc -> Doc -> Doc
+docCond _if _then _else = _if <+> fromText "?" <+> _then <+> fromText ":" <+> _else
 
 indentLevel :: Int
 indentLevel = 3
@@ -214,6 +219,7 @@ instance Pretty Proc_Bool where
  ppr (Text_Eq x y) = ppr x <> fromText "." <> pfunction "equals" [ppr y]
  ppr (Key_Eq x y) = parens $ ppr x <+> docEq <+> ppr y
  ppr (KeyCode_Eq x y) = parens $ ppr x <+> docEq <+> ppr y
+ ppr (Bool_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Value of 'True'.
 true :: Proc_Bool
@@ -257,6 +263,8 @@ data Proc_Int =
    -- Functions
  | Int_Abs Proc_Int
  | Int_Floor Proc_Float
+   -- Conditional
+ | Int_Cond Proc_Bool Proc_Int Proc_Int
    deriving Eq
 
 instance Extended Int Proc_Int where
@@ -274,6 +282,7 @@ instance Pretty Proc_Int where
  ppr (Int_Var t) = fromText t
  ppr (Int_Abs n) = pfunction "abs" [ppr n]
  ppr (Int_Floor x) = pfunction "floor" [ppr x]
+ ppr (Int_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Cast an 'Int' value.
 fromInt :: Int -> Proc_Int
@@ -345,6 +354,8 @@ data Proc_Float =
  | Float_Floor Proc_Float -- Applies floor but it treats the result
                           -- as a float. Only internal.
  | Float_Noise Proc_Float Proc_Float
+   -- Conditional
+ | Float_Cond Proc_Bool Proc_Float Proc_Float
    deriving (Eq,Ord)
 
 instance Extended Float Proc_Float where
@@ -371,6 +382,7 @@ recFloat f (Float_Arccosine x) = Float_Arccosine $ f x
 recFloat f (Float_Arctangent x) = Float_Arctangent $ f x
 recFloat f (Float_Floor x) = Float_Floor $ f x
 recFloat f (Float_Noise x y) = Float_Noise (f x) (f y)
+recFloat f (Float_Cond b x y) = Float_Cond b (f x) (f y)
 recFloat _ x = x
 
 instance Pretty Proc_Float where 
@@ -392,6 +404,7 @@ instance Pretty Proc_Float where
  ppr (Float_Arctangent x) = pfunction "atan" [ppr x]
  ppr (Float_Floor x) = pfunction "floor" [ppr x]
  ppr (Float_Noise x y) = pfunction "noise" [ppr x,ppr y]
+ ppr (Float_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Cast a 'Float' value.
 fromFloat :: Float -> Proc_Float
@@ -412,6 +425,7 @@ intToFloat (Int_Mod n m) = Float_Mod (intToFloat n) (intToFloat m)
 intToFloat (Int_Var t) = Float_Var t
 intToFloat (Int_Abs n) = Float_Abs $ intToFloat n
 intToFloat (Int_Floor x) = Float_Floor x
+intToFloat (Int_Cond b x y) = Float_Cond b (intToFloat x) (intToFloat y)
 
 -- | WARNING: 'signum' method is undefined.
 instance Num Proc_Float where
@@ -446,16 +460,21 @@ instance Floating Proc_Float where
  atanh = error "Proc_Float: atanh method is undefined."
 
 -- | Type of images.
-data Proc_Image = Image_Var Text deriving Eq
+data Proc_Image =
+   Image_Var Text
+ | Image_Cond Proc_Bool Proc_Image Proc_Image
+   deriving Eq
 
 instance Pretty Proc_Image where
  ppr (Image_Var t) = fromText t
+ ppr (Image_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Type of characters.
 data Proc_Char =
    Proc_Char Char
  | Char_Var Text
-   deriving Eq
+ | Char_Cond Proc_Bool Proc_Char Proc_Char
+   deriving (Eq,Ord)
 
 instance Extended Char Proc_Char where
  extend = Proc_Char
@@ -469,12 +488,15 @@ fromChar = extend
 instance Pretty Proc_Char where
  ppr (Proc_Char c) = enclose squote squote (char c)
  ppr (Char_Var n) = fromText n
+ ppr (Char_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Type of textual values.
 data Proc_Text =
    Proc_Text Text
  | Text_Var Text
-   deriving Eq
+   -- Conditional
+ | Text_Cond Proc_Bool Proc_Text Proc_Text
+   deriving (Eq,Ord)
 
 instance Extended Text Proc_Text where
  extend = Proc_Text
@@ -482,8 +504,11 @@ instance Extended Text Proc_Text where
  patmatch _ = Nothing
 
 instance Pretty Proc_Text where
+ -- Wrong pretty-printer for text values. Fix it to
+ -- escape characters.
  ppr (Proc_Text t) = enclose dquote dquote (fromText t)
  ppr (Text_Var n) = fromText n
+ ppr (Text_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Cast a strict 'Text' value.
 fromStText :: Text -> Proc_Text
@@ -497,7 +522,7 @@ data Proc_Key =
    Key_Var
  | Key_CODED
  | Key_Char Char
-   deriving Eq
+   deriving (Eq,Ord)
 
 instance Pretty Proc_Key where
  ppr Key_Var = fromText "key"
@@ -520,7 +545,7 @@ data Proc_KeyCode =
  | KeyCode_RETURN
  | KeyCode_ESC
  | KeyCode_DELETE
-   deriving Eq
+   deriving (Eq,Ord)
 
 instance Pretty Proc_KeyCode where
  ppr KeyCode_Var = fromText "keyCode"
@@ -679,36 +704,44 @@ class ProcType a where
  proc_arg :: a -> ProcArg
  -- | Variable reading.
  proc_read :: Var a -> a
+ -- | Conditional value.
+ proc_cond :: Proc_Bool -> a -> a -> a
 
 instance ProcType Proc_Bool where
  proc_asign = BoolAsign
  proc_arg = BoolArg
  proc_read (Var v) = Bool_Var v
+ proc_cond = Bool_Cond
 
 instance ProcType Proc_Int where
  proc_asign = IntAsign
  proc_arg = IntArg
  proc_read (Var v) = Int_Var v
+ proc_cond = Int_Cond
 
 instance ProcType Proc_Float where
  proc_asign = FloatAsign
  proc_arg = FloatArg
  proc_read (Var v) = Float_Var v
+ proc_cond = Float_Cond
 
 instance ProcType Proc_Image where
  proc_asign = ImageAsign
  proc_arg = ImageArg
  proc_read (Var v) = Image_Var v
+ proc_cond = Image_Cond
 
 instance ProcType Proc_Char where
  proc_asign = CharAsign
  proc_arg = CharArg
  proc_read (Var v) = Char_Var v
+ proc_cond = Char_Cond
 
 instance ProcType Proc_Text where
  proc_asign =  TextAsign
  proc_arg = TextArg
  proc_read (Var v) = Text_Var v
+ proc_cond = Text_Cond
 
 infix 4 #==, #/=
 
