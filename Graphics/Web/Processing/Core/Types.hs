@@ -16,7 +16,7 @@ module Graphics.Web.Processing.Core.Types (
   , MouseClicked (..)
   , MouseReleased (..)
   , KeyPressed (..)
-  -- * Processing types
+  -- * @Proc_*@ types
   , ProcType
   -- ** Bool
   , Proc_Bool, true, false

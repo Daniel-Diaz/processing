@@ -695,7 +695,27 @@ varFromText = Var
 
 ----- CLASSES
 
--- | Class of Processing value types.
+-- | Class of Processing value types (@Proc_*@ types).
+--
+--   @Proc_*@ types are types from the world of Processing.
+--   Some of them are similar to Haskell types, like 'Proc_Bool'
+--   and 'Bool'. However, they are not equal. @Proc_*@ types
+--   are instance of 'Eq'. However, you should instead use methods from
+--   analog 'Proc_Eq' class. @Proc_*@ types contain expressions instead
+--   of values. Think of @2+2@ instead of @4@. Under this situation,
+--   @2+2 /= 3+1@, since they are different expressions, even if they
+--   evaluate to the same value. Actually, you will get 'True'
+--   from the evaluation of @2+2 == 3+1@, since the library is smart
+--   enough to figure out they are the same value. But, please, don't
+--   rely on this. Use the 'Proc_Eq' and 'Proc_Ord' classes instead.
+--   They return Processing boolean expressions instead of 'Bool' values.
+--   Anyway, the types of the library will try to force you to use @Proc_*@
+--   types everywhere.
+--
+--   The reason this library stores expressions instead of values is that
+--   it needs to handle things like @2+x@, where @x@ is an unknown value.
+--   However, an effort is done to ensure that each expression is reduced
+--   to its minimum extension.
 class ProcType a where
  -- | Create a variable assignment, provided
  --   the name of the variable and the value to asign.
