@@ -274,7 +274,7 @@ interactiveFigure mw mh framerate s0 _print bg step onclick keyevents = execScri
   let w = maybe screenWidth  fromInt mw
       h = maybe screenHeight fromInt mh
   v <- newVarC s0
-  keyv <- newVar true
+  keyv <- newVar false
   on Setup $ do
      setFrameRate $ fromInt framerate
   on Draw $ do
@@ -305,4 +305,3 @@ keyEvent v keyv ((k,f),n) = do
   b <- readVar keyv
   ifM b (readVarC v >>= writeVarC v . f)
         (return ())
-  writeVar keyv true

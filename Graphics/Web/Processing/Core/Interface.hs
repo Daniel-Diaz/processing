@@ -355,7 +355,7 @@ matchKey :: (ProcMonad m, Monad (m KeyPressed)) => Var Proc_Bool -> Key -> m Key
 matchKey v k = do
   let (codedKeys,uncodedKey) = keySplit k
   if null codedKeys
-     then return ()
+     then writeVar v true
      else iff (Key_Var #== Key_CODED)
               (writeVar v $ foldr1 (#&&) $ fmap (KeyCode_Var #==) codedKeys)
               (writeVar v false)
