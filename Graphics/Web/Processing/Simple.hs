@@ -1,4 +1,6 @@
 
+{-# LANGUAGE OverloadedStrings #-}
+
 -- | A 'Monoid' models figures in the plane.
 --   Then, figures are displayed or animated using
 --   a Processing script.
@@ -71,6 +73,7 @@ module Graphics.Web.Processing.Simple (
    ) where
 
 import Data.Monoid
+import Data.String
 import Graphics.Web.Processing.Core.Types
 import Graphics.Web.Processing.Mid
 import Graphics.Web.Processing.Mid.CustomVar
@@ -292,11 +295,12 @@ interactiveFigure mw mh framerate s0 _print bg step onclick keyevents = execScri
      writeComment "Mouse event"
      p <- getMousePoint
      writeVarC v $ onclick p s
-  when (not $ null keyevents) $ on KeyPressed $ mapM_ (keyEvent v keyv) keyevents
+  when (not $ null keyevents) $ on KeyPressed $ mapM_ (keyEvent v keyv) $ zip keyevents [1..]
 
 keyEvent :: CustomValue w
-         => CustomVar w -> Var Proc_Bool -> (Key,w -> w) -> EventM KeyPressed ()
-keyEvent v keyv (k,f) = do
+         => CustomVar w -> Var Proc_Bool -> ((Key,w -> w),Int) -> EventM KeyPressed ()
+keyEvent v keyv ((k,f),n) = do
+  writeComment $ "Key event " <> fromString (show n)
   matchKey keyv k
   b <- readVar keyv
   ifM b (readVarC v >>= writeVarC v . f)
