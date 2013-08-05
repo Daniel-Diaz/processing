@@ -904,22 +904,14 @@ reduceProcPair _ _ = Nothing
 --
 -- It consists in several parts, most of them optional.
 --
--- * 'Preamble': Usually the place where variables are
---   initialized.
---
--- * 'Setup': After running the code in the preamble,
---   the code in this part is executed once.
---
--- * 'Draw': After the setup, this part of the code is
---   executed in loops over and over again.
---
--- * 'MouseClicked': Each time the user clicks, the code
---   here is executed once.
---
 -- To generate each part of the code, use the 'ProcM' monad
 -- and the functions from the "Graphics.Web.Processing.Interface"
 -- module. Then, run 'runProcM' or 'execProcM' to get the
 -- code result.
+--
+-- More abstract functions generate 'ProcScript' values as well.
+-- See modules "Graphics.Web.Processing.Mid" and "Graphics.Web.Processing.Simple"
+-- for two alternative ways.
 data ProcScript = ProcScript
  { proc_preamble :: ProcCode Preamble
  , proc_setup :: ProcCode Setup

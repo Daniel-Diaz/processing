@@ -76,6 +76,7 @@ import Graphics.Web.Processing.Mid
 import Graphics.Web.Processing.Mid.CustomVar
 -- state
 import Control.Applicative ((<$>))
+import Control.Monad (when)
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
 
@@ -291,13 +292,13 @@ interactiveFigure mw mh framerate s0 _print bg step onclick keyevents = execScri
      writeComment "Mouse event"
      p <- getMousePoint
      writeVarC v $ onclick p s
-  on KeyPressed $ mapM_ (keyEvent v keyv) keyevents
+  when (not $ null keyevents) $ on KeyPressed $ mapM_ (keyEvent v keyv) keyevents
 
 keyEvent :: CustomValue w
          => CustomVar w -> Var Proc_Bool -> (Key,w -> w) -> EventM KeyPressed ()
 keyEvent v keyv (k,f) = do
   matchKey keyv k
   b <- readVar keyv
-  iff b (readVarC v >>= writeVarC v . f)
+  ifM b (readVarC v >>= writeVarC v . f)
         (return ())
   writeVar keyv true

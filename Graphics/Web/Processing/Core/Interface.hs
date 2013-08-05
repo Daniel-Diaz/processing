@@ -48,7 +48,7 @@ module Graphics.Web.Processing.Core.Interface (
    , SpecialKey (..)
    , matchKey
    -- * Conditionals
-   , iff
+   , ifM
    -- * Others
    , frameCount
    , getFrameRate
@@ -59,8 +59,16 @@ module Graphics.Web.Processing.Core.Interface (
 
 -- Internal
 import Graphics.Web.Processing.Core.Primal
+  ( Proc_Key (..)
+  , Proc_KeyCode (..)
+  , varFromText
+  , noisef
+  , ProcType (..)
+  , ProcArg
+    )
+import Graphics.Web.Processing.Core.Types
 import Graphics.Web.Processing.Core.Monad
-import Graphics.Web.Processing.Core.Var (writeVar,readVar)
+import Graphics.Web.Processing.Core.Var
 --
 import Control.Arrow (first)
 
@@ -95,15 +103,7 @@ noise (x,y) = return $ noisef x y
 ---- DRAWING
 
 -- | Class of contexts where the user can draw pictures
---   in the screen. Instances:
---
--- * 'Setup'
---
--- * 'Draw'
---
--- * 'MouseClicked'
---
--- * 'MouseReleased'
+--   in the screen.
 class Drawing a where
 
 instance Drawing Setup where
@@ -288,6 +288,15 @@ translate x y = commandM "translate" [ proc_arg x, proc_arg y ]
 resetMatrix :: (ProcMonad m, Drawing c)
             => m c ()
 resetMatrix = commandM "resetMatrix" []
+
+---- CONDITIONAL
+
+-- | Conditional execution. When the boolean value is 'true',
+--   it executes the first monadic argument. Otherwise, it
+--   executes the other one. In any case, the result is discarded.
+--   See also 'if_'.
+ifM :: ProcMonad m => Proc_Bool -> m c a -> m c b -> m c ()
+ifM = iff
 
 ---- MOUSE
 
