@@ -17,6 +17,8 @@ import Control.Monad.Trans.State.Strict
 import Graphics.Web.Processing.Core.Primal
 import Control.Applicative (Applicative (..))
 import Data.Text (Text)
+import Data.Monoid ((<>))
+import Data.String (fromString)
 
 -- | Processing script producer monad. The context @c@ indicates the context
 --   of the underlying 'ProcCode'. This context restricts the use of certain
@@ -70,6 +72,9 @@ getVarNumber = ProcM get
 setVarNumber :: Int -> ProcM c ()
 setVarNumber = ProcM . put
 
+intVarName :: Int -> Text
+intVarName n = "v_" <> fromString (show n)
+
 -- Processing Monad class
 
 -- | Types in this instance form a monad when they are applied
@@ -91,7 +96,26 @@ class ProcMonad m where
      -> m c ()
  -- | Lift a 'ProcM' computation.
  liftProc :: ProcM c a -> m c a
+ -- | Create a new variable with a starting value.
+ newVar :: ProcType a => a -> m Preamble (Var a)
+ -- | Read a variable.
+ readVar :: ProcType a => Var a -> m c a
+ -- | Write a new value to a variable.
+ writeVar :: ProcType a => Var a -> a -> m c ()
 
+-- | When using this instance, please, be aware of the
+--   behavior of 'readVar'.
+--
+--   /It does not matter when read the variable/.
+--   The result will /always/ hold the last value asigned to the variable.
+--   For example, this code
+--
+-- > v <- newVar 10
+-- > ten <- readVar v
+-- > writeVar v 20
+-- > point (10,ten)
+--
+--   will draw a point at (10,20).
 instance ProcMonad ProcM where
  commandM n as = ProcM $ lift $ tell $ command n as
  assignM = ProcM . lift . tell . assignment
@@ -104,3 +128,10 @@ instance ProcMonad ProcM where
    put i2
    lift $ tell $ conditional b c1 c2
  liftProc = id
+ newVar x = do
+   n <- newVarNumber
+   let v = intVarName n
+   createVarM (proc_asign v x)
+   return $ varFromText v
+ readVar = return . proc_read
+ writeVar v x = assignM $ proc_asign (varName v) x

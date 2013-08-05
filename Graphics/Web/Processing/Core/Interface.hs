@@ -86,11 +86,11 @@ screenHeight = proc_read $ varFromText "screenHeight"
 
 -- | Frames since the beginning of the script execution.
 frameCount :: (ProcMonad m, Monad (m c)) => m c Proc_Int
-frameCount = readVar $ varFromText "frameCount"
+frameCount = liftProc $ readVar $ varFromText "frameCount"
 
 -- | Approximate number of frames per second.
 getFrameRate :: (ProcMonad m, Monad (m c)) => m c Proc_Int
-getFrameRate = readVar $ varFromText "frameRate"
+getFrameRate = liftProc $ readVar $ varFromText "frameRate"
 
 -- COMMANDS
 
@@ -303,8 +303,8 @@ ifM = iff
 -- | Get the current position of the mouse pointer.
 getMousePoint :: (ProcMonad m, Monad (m c)) => m c Proc_Point
 getMousePoint = do
- x <- readVar $ varFromText "mouseX"
- y <- readVar $ varFromText "mouseY"
+ x <- liftProc $ readVar $ varFromText "mouseX"
+ y <- liftProc $ readVar $ varFromText "mouseY"
  return (x,y)
 
 ---- KEYBOARD
@@ -359,7 +359,7 @@ matchKey v k = do
      else iff (Key_Var #== Key_CODED)
               (writeVar v $ foldr1 (#&&) $ fmap (KeyCode_Var #==) codedKeys)
               (writeVar v false)
-  b <- readVar v
+  b <- liftProc $ readVar v
   case uncodedKey of
     Nothing -> return ()
     Just (Left  pk) -> writeVar v $ Key_Var     #== pk #&& b

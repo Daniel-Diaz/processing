@@ -62,18 +62,18 @@ data CustomVar a = CustomVar [Text] deriving Generic
 -- | Typeclass of custom values, which can be stored in custom variables ('CustomVar').
 class VarLength a => CustomValue a where
  -- | Version of 'newVar' for custom variables.
- newVarC :: (Monad (m Preamble), ProcVarMonad m) => a -> m Preamble (CustomVar a)
- default newVarC :: (Monad (m Preamble), ProcVarMonad m, Generic a, GCustomValue (Rep a))
+ newVarC :: (Monad (m Preamble), ProcMonad m) => a -> m Preamble (CustomVar a)
+ default newVarC :: (Monad (m Preamble), ProcMonad m, Generic a, GCustomValue (Rep a))
                  => a -> m Preamble (CustomVar a)
  newVarC x = liftM castCVar $ gnewVarC (from x)
  -- | Version of 'readVar' for custom variables.
- readVarC :: (Monad (m c), ProcVarMonad m) => CustomVar a -> m c a
- default readVarC :: (Monad (m c), ProcVarMonad m, Generic a, GCustomValue (Rep a))
+ readVarC :: (Monad (m c), ProcMonad m) => CustomVar a -> m c a
+ default readVarC :: (Monad (m c), ProcMonad m, Generic a, GCustomValue (Rep a))
                   => CustomVar a -> m c a
  readVarC v = liftM to $ greadVarC (castCVar v)
  -- | Version of 'writeVar' for custom variables.
- writeVarC :: (Monad (m c), ProcVarMonad m) => CustomVar a -> a -> m c ()
- default writeVarC :: (Monad (m c), ProcVarMonad m, Generic a, GCustomValue (Rep a)) => CustomVar a -> a -> m c ()
+ writeVarC :: (Monad (m c), ProcMonad m) => CustomVar a -> a -> m c ()
+ default writeVarC :: (Monad (m c), ProcMonad m, Generic a, GCustomValue (Rep a)) => CustomVar a -> a -> m c ()
  writeVarC v x = gwriteVarC (castCVar v) (from x)
 
 fromVar :: Var a -> CustomVar a
@@ -157,9 +157,9 @@ castCVar :: CustomVar a -> CustomVar b
 castCVar (CustomVar xs) = CustomVar xs
 
 class GCustomValue f where
- gnewVarC :: (Monad (m Preamble), ProcVarMonad m) => f a -> m Preamble (CustomVar (f a))
- greadVarC :: (Monad (m c), ProcVarMonad m) => CustomVar (f a) -> m c (f a)
- gwriteVarC :: (Monad (m c), ProcVarMonad m) => CustomVar (f a) -> f a -> m c ()
+ gnewVarC :: (Monad (m Preamble), ProcMonad m) => f a -> m Preamble (CustomVar (f a))
+ greadVarC :: (Monad (m c), ProcMonad m) => CustomVar (f a) -> m c (f a)
+ gwriteVarC :: (Monad (m c), ProcMonad m) => CustomVar (f a) -> f a -> m c ()
 
 instance (GVarLength a, GCustomValue a, GCustomValue b) => GCustomValue (a :*: b) where
  gnewVarC (a :*: b) = do

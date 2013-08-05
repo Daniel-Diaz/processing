@@ -51,9 +51,7 @@ module Graphics.Web.Processing.Mid (
   , on
   , execScriptM
     -- * Variables
-  , Var
-  , varName
-  , ProcVarMonad (..)
+  , module Graphics.Web.Processing.Core.Var
     -- * Interface
   , module Graphics.Web.Processing.Core.Interface
   ) where
@@ -62,8 +60,7 @@ import Graphics.Web.Processing.Core.Monad
 import Graphics.Web.Processing.Core.Types
 import Graphics.Web.Processing.Core.Interface
 -- variables
-import Graphics.Web.Processing.Core.Var (Var,varName)
-import qualified Graphics.Web.Processing.Core.Var as Var
+import Graphics.Web.Processing.Core.Var
 -- optimization
 import Graphics.Web.Processing.Optimize
 -- transformers
@@ -131,6 +128,17 @@ instance ProcMonad EventM where
    addCode $ iff b (event_code s1) (event_code s2)
  -- Create variables in an event? That should never happen, really.
  createVarM = fail "EventM(createVarM): This error should never be called. Report this as an issue."
+ writeVar v x = liftProc $ writeVar v x
+ readVar v = do
+  x <- liftProc $ readVar v
+  addPCode $ void $ liftProc $ newVar x
+  n <- switchContextE $ liftProc getVarNumber
+  let v' = fst $ runProcMWith n $ liftProc $ newVar x
+  liftProc $ setVarNumber $ n + 1
+  writeVar v' x
+  liftProc $ readVar v'
+ -- New variable in an event? That should not happen, really.
+ newVar = fail "EventM(newVar): This error should never be called. Report this as an issue."
 
 data ScriptState c =
   ScriptState
@@ -182,6 +190,12 @@ instance ProcMonad ScriptM where
                      (f script_mouseClicked)
                      (f script_mouseReleased)
                      (f script_keyPressed)
+ newVar = liftProc . newVar
+ writeVar v x = liftProc $ writeVar v x
+ readVar v = do
+  x  <- liftProc $ readVar v
+  v' <- switchContext $ liftProc $ newVar x
+  liftProc $ readVar v'
 
 -- | Context of an event. The context determines which functions can be used.
 --   'Preamble' is not an instance of 'Context' to avoid using 'Preamble' as
@@ -236,19 +250,7 @@ execScriptM (ScriptM s0) =
     , proc_keyPressed = fmap execProcM $ script_keyPressed s
       }
 
--- Variables
-
--- | Class of monads where variables can be set in a natural
---   way (similar to 'IORef'). Instances of this class behave
---   in a proper way, without the weird behavior of the original
---   'Var.readVar'.
-class ProcMonad m => ProcVarMonad m where
- -- | Create a new variable with a starting value.
- newVar :: ProcType a => a -> m Preamble (Var a)
- -- | Read a variable.
- readVar :: ProcType a => Var a -> m c a
- -- | Write a new value to a variable.
- writeVar :: ProcType a => Var a -> a -> m c ()
+-- Coercions
 
 -- | Magic! Keep it private, it's our secret!
 switchContext :: ScriptM c a -> ScriptM d a
@@ -258,23 +260,3 @@ switchContext = unsafeCoerce
 switchContextE :: EventM c a -> EventM d a
 switchContextE = unsafeCoerce
 
-instance ProcVarMonad ScriptM where
- newVar = Var.newVar
- writeVar = Var.writeVar
- readVar v = do
-  x  <- Var.readVar v
-  v' <- switchContext $ Var.newVar x
-  Var.readVar v'
-
-instance ProcVarMonad EventM where
- writeVar = Var.writeVar
- readVar v = do
-  x <- Var.readVar v
-  addPCode $ void $ Var.newVar x
-  n <- switchContextE $ liftProc getVarNumber
-  let v' = fst $ runProcMWith n $ Var.newVar x
-  liftProc $ setVarNumber $ n + 1
-  writeVar v' x
-  Var.readVar v'
- -- New variable in an event? That should not happen, really.
- newVar = fail "EventM(newVar): This error should never be called. Report this as an issue."
