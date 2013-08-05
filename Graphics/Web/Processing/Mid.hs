@@ -168,6 +168,8 @@ instance Monad (ScriptM c) where
  return = pure
  (ScriptM s) >>= f = ScriptM $ s >>= unScriptM . f
 
+-- | Events created inside a conditional will be automatically deleted.
+--   They must be /unconditional/.
 instance ProcMonad ScriptM where
  liftProc p = ScriptM $ do
    ss <- get
