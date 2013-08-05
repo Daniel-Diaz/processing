@@ -73,8 +73,8 @@ Library
     , mainland-pretty >= 0.2 && < 0.3
     , blaze-html >= 0.5.1 && < 0.7
     , multiset >= 0.2.2 && < 0.3
-    , directory
-    , filepath
+    , directory >= 1.2 && < 1.3
+    , filepath >= 1.1.0.0 && < 1.4
   -- Compatibility with previous GHC versions.
   if impl(ghc < 7.6)
      Build-depends: ghc-prim
