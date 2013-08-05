@@ -57,6 +57,7 @@ Extra-source-files:
   examples/twist.hs
   examples/mill.hs
   examples/keys.hs
+  examples/random.hs
 
 Source-repository head
   type: git

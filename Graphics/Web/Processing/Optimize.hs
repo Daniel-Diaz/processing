@@ -43,7 +43,6 @@ numOps (Float_Substract x y) = 1 + numOps x + numOps y
 numOps (Float_Divide x y) = 1 + numOps x + numOps y
 numOps (Float_Mult x y) = 1 + numOps x + numOps y
 numOps (Float_Mod x y) = 1 + numOps x + numOps y
-numOps (Float_Var _) = 0
 numOps (Float_Abs x) = 1 + numOps x
 numOps (Float_Exp x) = 1 + numOps x
 numOps (Float_Sqrt x) = 1 + numOps x
@@ -54,8 +53,12 @@ numOps (Float_Arcsine x) = 1 + numOps x
 numOps (Float_Arccosine x) = 1 + numOps x
 numOps (Float_Arctangent x) = 1 + numOps x
 numOps (Float_Floor x) = 1 + numOps x
+numOps (Float_Round x) = 1 + numOps x
 numOps (Float_Noise x y) = 1 + numOps x + numOps y
 numOps (Float_Cond b x y) = boolops b + max (numOps x) (numOps y)
+-- Variable things are worth zero.
+numOps (Float_Var _) = 0
+numOps (Float_Random _ _) = 0
 
 -----------------------------------------------------
 -----------------------------------------------------
@@ -112,6 +115,7 @@ browseFloat f@(Float_Arcsine x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Arccosine x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Arctangent x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Floor x) = addFloat f >> browseFloat x
+browseFloat f@(Float_Round x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Noise x y) = addFloat f >> browseFloat x >> browseFloat y
 browseFloat f@(Float_Cond _ x y) = addFloat f >> browseFloat x >> browseFloat y
 browseFloat _ = return ()

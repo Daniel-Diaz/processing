@@ -30,6 +30,7 @@ module Graphics.Web.Processing.Core.Types (
   , Proc_Float
   , fromFloat
   , pfloor
+  , pround
   -- ** Char
   , Proc_Char
   , fromChar

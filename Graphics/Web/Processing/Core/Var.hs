@@ -1,8 +1,5 @@
 
 -- | Module exporting 'Var' type and functions.
---   The /basic/ interface uses these variable functions.
---   However, they introduce a not-really-coherent
---   behavior.
 module Graphics.Web.Processing.Core.Var (
   -- * Variables
 

@@ -9,6 +9,7 @@ module Graphics.Web.Processing.Core.Interface (
      screenWidth, screenHeight
    -- * Commands
    -- ** General
+   , random
    , noise
    -- ** Drawing
    , Drawing
@@ -62,6 +63,7 @@ import Graphics.Web.Processing.Core.Primal
   ( Proc_Key (..)
   , Proc_KeyCode (..)
   , varFromText
+  , Proc_Float (..)
   , noisef
   , ProcType (..)
   , ProcArg
@@ -99,6 +101,14 @@ getFrameRate = liftProc $ readVar $ varFromText "frameRate"
 -- | Noise random function.
 noise :: (ProcMonad m, Monad (m c)) => Proc_Point -> m c Proc_Float
 noise (x,y) = return $ noisef x y
+
+-- | Write a variable with a random number within an interval.
+random :: ProcMonad m
+       => Var Proc_Float -- ^ Target variable.
+       -> Proc_Float -- ^ Left endpoint of the interval.
+       -> Proc_Float -- ^ Right endpoint of the interval.
+       -> m c ()
+random v a b = writeVar v $ Float_Random a b
 
 ---- DRAWING
 

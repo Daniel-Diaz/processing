@@ -18,7 +18,7 @@ module Graphics.Web.Processing.Core.Primal (
   , pnot, (#||), (#&&)
   -- *** Int
   , Proc_Int, fromInt
-  , pfloor
+  , pfloor, pround
   -- *** Float
   , Proc_Float (..), fromFloat
   , recFloat
@@ -263,6 +263,7 @@ data Proc_Int =
    -- Functions
  | Int_Abs Proc_Int
  | Int_Floor Proc_Float
+ | Int_Round Proc_Float
    -- Conditional
  | Int_Cond Proc_Bool Proc_Int Proc_Int
    deriving Eq
@@ -282,16 +283,22 @@ instance Pretty Proc_Int where
  ppr (Int_Var t) = fromText t
  ppr (Int_Abs n) = pfunction "abs" [ppr n]
  ppr (Int_Floor x) = pfunction "floor" [ppr x]
+ ppr (Int_Round x) = pfunction "round" [ppr x]
  ppr (Int_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Cast an 'Int' value.
 fromInt :: Int -> Proc_Int
 fromInt = extend
 
--- | Calculates the 'floor' of a 'Proc_Float'.
+-- | Calculate the 'floor' of a 'Proc_Float'.
 pfloor :: Proc_Float -> Proc_Int
 pfloor (Proc_Float x) = Proc_Int $ floor x
 pfloor x = Int_Floor x
+
+-- | Round a number to the closest integer.
+pround :: Proc_Float -> Proc_Int
+pround (Proc_Float x) = Proc_Int $ round x
+pround x = Int_Round x
 
 instance Ord Proc_Int where
  n <= m = case liftA2 (<=) (patmatch n) (patmatch m) of
@@ -353,7 +360,9 @@ data Proc_Float =
  | Float_Arctangent Proc_Float
  | Float_Floor Proc_Float -- Applies floor but it treats the result
                           -- as a float. Only internal.
+ | Float_Round Proc_Float -- Same observation for Float_Floor.
  | Float_Noise Proc_Float Proc_Float
+ | Float_Random Proc_Float Proc_Float
    -- Conditional
  | Float_Cond Proc_Bool Proc_Float Proc_Float
    deriving (Eq,Ord)
@@ -381,8 +390,10 @@ recFloat f (Float_Arcsine x) = Float_Arcsine $ f x
 recFloat f (Float_Arccosine x) = Float_Arccosine $ f x
 recFloat f (Float_Arctangent x) = Float_Arctangent $ f x
 recFloat f (Float_Floor x) = Float_Floor $ f x
+recFloat f (Float_Round x) = Float_Round $ f x
 recFloat f (Float_Noise x y) = Float_Noise (f x) (f y)
 recFloat f (Float_Cond b x y) = Float_Cond b (f x) (f y)
+recFloat f (Float_Random x y) = Float_Random (f x) (f y)
 recFloat _ x = x
 
 instance Pretty Proc_Float where 
@@ -403,8 +414,10 @@ instance Pretty Proc_Float where
  ppr (Float_Arccosine x) = pfunction "acos" [ppr x]
  ppr (Float_Arctangent x) = pfunction "atan" [ppr x]
  ppr (Float_Floor x) = pfunction "floor" [ppr x]
+ ppr (Float_Round x) = pfunction "found" [ppr x]
  ppr (Float_Noise x y) = pfunction "noise" [ppr x,ppr y]
  ppr (Float_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
+ ppr (Float_Random x y) = pfunction "random" [ppr x,ppr y]
 
 -- | Cast a 'Float' value.
 fromFloat :: Float -> Proc_Float
@@ -425,6 +438,7 @@ intToFloat (Int_Mod n m) = Float_Mod (intToFloat n) (intToFloat m)
 intToFloat (Int_Var t) = Float_Var t
 intToFloat (Int_Abs n) = Float_Abs $ intToFloat n
 intToFloat (Int_Floor x) = Float_Floor x
+intToFloat (Int_Round x) = Float_Round x
 intToFloat (Int_Cond b x y) = Float_Cond b (intToFloat x) (intToFloat y)
 
 -- | WARNING: 'signum' method is undefined.
