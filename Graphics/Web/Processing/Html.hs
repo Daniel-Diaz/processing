@@ -35,6 +35,9 @@ import Text.Blaze.Html5.Attributes (src,type_)
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Data.Text (Text)
 import Data.Text.Lazy.IO (writeFile)
+-- System
+import System.FilePath
+import System.Directory
 
 -- | Create a canvas element which contain a Processing animation.
 --   The output is of the following form:
@@ -68,15 +71,21 @@ defaultHtml pfp sfp tit = docTypeHtml $ do
   body $ procCanvas sfp
 
 defaultCSS :: Text
-defaultCSS = "body {margin: 0 ; overflow:hidden ;} canvas {width: 100% ;}"
+defaultCSS = "body {margin: 0 ; overflow:hidden ;} canvas {width: 100% ; outline:none ;}"
 
 -- | Write a Processing script and the HTML default template for it
 --   to files, using 'renderFile' and 'defaultHtml'.
-writeHtml :: FilePath -- ^ Where to find the /processing.js/ module.
-          -> FilePath -- ^ Where to write the Processing script (with @.pde@ extension).
-          -> Text     -- ^ Html title.
-          -> FilePath -- ^ Where to write the HTML file (with @.html@ extension).
+--   All the 'FilePath's must be relative to where the HTML file is written.
+writeHtml :: FilePath   -- ^ Where to find the /processing.js/ module.
+          -> FilePath   -- ^ Where to write the Processing script (with @.pde@ extension).
+          -> Text       -- ^ Html title.
+          -> FilePath   -- ^ Where to write the HTML file (with @.html@ extension).
           -> ProcScript -- ^ Processing script.
           -> IO ()
-writeHtml pfp sfp tit hfp ps =
-  renderFile sfp ps >> Data.Text.Lazy.IO.writeFile hfp (renderHtml $ defaultHtml pfp sfp tit)
+writeHtml pfp sfp tit hfp ps = do
+  d0 <- getCurrentDirectory
+  setCurrentDirectory $ takeDirectory hfp
+  renderFile sfp ps
+  let fn = takeFileName hfp
+  Data.Text.Lazy.IO.writeFile fn (renderHtml $ defaultHtml pfp sfp tit)
+  setCurrentDirectory d0
