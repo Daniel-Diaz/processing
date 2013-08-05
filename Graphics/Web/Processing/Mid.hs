@@ -69,7 +69,6 @@ import Control.Applicative
 import Control.Monad.Trans.State.Strict
 -- monoids
 import Data.Monoid
-import Data.Foldable (foldMap)
 -- unsafe!
 import Unsafe.Coerce
 
@@ -174,28 +173,28 @@ instance ProcMonad ScriptM where
    ss <- get
    let c = script_code ss >> p
    put $ ss { script_code = void c }
-   return $ fst $ runProcM $ c
+   return $ fst $ runProcM c
  commandM t as = liftProc $ commandM t as
  assignM = liftProc . assignM
  createVarM = liftProc . createVarM
  writeComment = liftProc . writeComment
- iff b (ScriptM e1) (ScriptM e2) = ScriptM $ do
-   s0 <- get
-   let s1  = execState e1 emptyScriptState
-       s2  = execState e2 emptyScriptState
-       f g = getLast $ foldMap (Last . g) [s0,s1,s2]
-   put $ ScriptState (script_code s0 >> iff b (script_code s1) (script_code s2))
-                     (f script_setup)
-                     (f script_draw)
-                     (f script_mouseClicked)
-                     (f script_mouseReleased)
-                     (f script_keyPressed)
+ iff b (ScriptM e1) (ScriptM e2) = do
+   c0 <- script_code <$> ScriptM get
+   let n  = fst $ runProcM $ c0 >> getVarNumber
+       s1 = execState e1 $ emptyScriptState { script_code = setVarNumber n  }
+       c1 = script_code s1
+       n1 = fst $ runProcM $ c1 >> getVarNumber
+       s2 = execState e2 $ emptyScriptState { script_code = setVarNumber n1 }
+       c2 = script_code s2
+       n2 = fst $ runProcM $ c2 >> getVarNumber
+   liftProc $ setVarNumber n2
+   liftProc $ iff b c1 c2
  newVar = liftProc . newVar
  writeVar v x = liftProc $ writeVar v x
  readVar v = do
-  x  <- liftProc $ readVar v
-  v' <- switchContext $ liftProc $ newVar x
-  liftProc $ readVar v'
+   x  <- liftProc $ readVar v
+   v' <- switchContext $ newVar x
+   liftProc $ readVar v'
 
 -- | Context of an event. The context determines which functions can be used.
 --   'Preamble' is not an instance of 'Context' to avoid using 'Preamble' as
