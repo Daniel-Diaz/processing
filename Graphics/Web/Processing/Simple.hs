@@ -263,7 +263,8 @@ interactiveFigure :: CustomValue w
   -> (Proc_Point -> w -> w) -- ^ Function called each time the mouse is clicked.
   -> [(Key,w -> w)] -- ^ Key events. List of pairs, where the first component is
                     --   a 'Key' and the second component is the reaction to that
-                    --   'Key'.
+                    --   'Key'. File @examples/keys.hs@ contains an example of
+                    --   usage.
   -> ProcScript
 interactiveFigure mw mh framerate s0 _print bg step onclick keyevents = execScriptM $ do
   let w = maybe screenWidth  fromInt mw
