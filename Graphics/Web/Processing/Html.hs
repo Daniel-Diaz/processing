@@ -64,8 +64,11 @@ defaultHtml pfp sfp tit = docTypeHtml $ do
   head $ do title $ toHtml tit
             importScript pfp
             style ! type_ "text/css" $
-              preEscapedToHtml ("body {margin: 0 ;} canvas {width: 100% ;}" :: Text)
+              preEscapedToHtml defaultCSS
   body $ procCanvas sfp
+
+defaultCSS :: Text
+defaultCSS = "body {margin: 0 ; overflow:hidden ;} canvas {width: 100% ;}"
 
 -- | Write a Processing script and the HTML default template for it
 --   to files, using 'renderFile' and 'defaultHtml'.
