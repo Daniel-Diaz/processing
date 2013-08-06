@@ -310,10 +310,12 @@ subsComment c =
  if c == mempty then mempty
                 else Comment "Variables from the Substitution Optimization." <> c
 
--- | Optimizations are projections, i.e.
+-- | Optimizations are projections. In particular:
 --
 -- > let f = optimizeBySubstitution
 -- > in  f x == f (f x)
+--
+--   This function checks that this equality holds for a given @x@.
 prop_optimizeBySubstitution_projection :: ProcScript -> Bool
 prop_optimizeBySubstitution_projection x =
  let f = optimizeBySubstitution

@@ -280,19 +280,19 @@ interactiveFigure mw mh framerate s0 _print bg step onclick keyevents = execScri
   on Draw $ do
      size w h
      translate (intToFloat w/2) (intToFloat h/2)
-     writeComment "Read state"
+     comment "Read state"
      s <- readVarC v
-     writeComment "Background color"
+     comment "Background color"
      background $ bg s
-     writeComment "Draw state"
+     comment "Draw state"
      figureEvent $ _print s
-     writeComment $ "Update state"
+     comment $ "Update state"
      n <- frameCount
      writeVarC v $ step n s
   on MouseClicked $ do
-     writeComment "Read state"
+     comment "Read state"
      s <- readVarC v
-     writeComment "Mouse event"
+     comment "Mouse event"
      p <- getMousePoint
      writeVarC v $ onclick p s
   when (not $ null keyevents) $ on KeyPressed $ mapM_ (keyEvent v keyv) $ zip keyevents [1..]
@@ -300,7 +300,7 @@ interactiveFigure mw mh framerate s0 _print bg step onclick keyevents = execScri
 keyEvent :: CustomValue w
          => CustomVar w -> Var Proc_Bool -> ((Key,w -> w),Int) -> EventM KeyPressed ()
 keyEvent v keyv ((k,f),n) = do
-  writeComment $ "Key event " <> fromString (show n)
+  comment $ "Key event " <> fromString (show n)
   matchKey keyv k
   b <- readVar keyv
   ifM b (readVarC v >>= writeVarC v . f)

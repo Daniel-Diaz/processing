@@ -53,7 +53,7 @@ module Graphics.Web.Processing.Core.Interface (
    -- * Others
    , frameCount
    , getFrameRate
-   , writeComment
+   , comment
    -- * Processing monads
    , ProcMonad
    ) where
@@ -73,6 +73,7 @@ import Graphics.Web.Processing.Core.Monad
 import Graphics.Web.Processing.Core.Var
 --
 import Control.Arrow (first)
+import Data.Text (Text)
 
 ---- PREDEFINED VALUES
 
@@ -385,3 +386,11 @@ size w h = commandM "size" [proc_arg w, proc_arg h]
 --   The default rate is 60 frames per second.
 setFrameRate :: ProcMonad m => Proc_Int -> m Setup ()
 setFrameRate r = commandM "frameRate" [proc_arg r]
+
+---- COMMENTS
+
+-- | Include a comment in the current position of the code.
+--   You normally don't need to read the processing.js code output,
+--   but this function can be useful to analyse or debug it.
+comment :: ProcMonad m => Text -> m c ()
+comment = writeComment

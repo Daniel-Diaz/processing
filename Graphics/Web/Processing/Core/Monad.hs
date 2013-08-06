@@ -106,7 +106,7 @@ class ProcMonad m where
 -- | When using this instance, please, be aware of the
 --   behavior of 'readVar'.
 --
---   /It does not matter when read the variable/.
+--   /It does not matter when the variable is read/.
 --   The result will /always/ hold the last value asigned to the variable.
 --   For example, this code
 --
