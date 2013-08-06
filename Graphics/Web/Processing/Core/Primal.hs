@@ -1,5 +1,7 @@
 
-{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, FunctionalDependencies,
+             DeriveGeneric, TypeOperators, DefaultSignatures, FlexibleContexts
+  #-}
 
 -- | Internal module. Mostly for type definitions
 --   and class instances.
@@ -63,14 +65,77 @@ events, etc. I think 'Reducible' deserves a module by itself.
 -}
 
 import Prelude hiding (foldr)
-import Data.Text (Text,lines)
+import Data.Text (Text,lines,pack)
 import qualified Data.Sequence as Seq
 import Data.Monoid
 import Data.String
 import Data.Foldable (foldMap,foldr)
-import Control.Applicative (liftA2)
+import Control.Applicative
 -- Pretty
 import Text.PrettyPrint.Mainland
+-- QuickCheck
+import Test.QuickCheck (Arbitrary (..), Gen, oneof, sized, resize, vectorOf)
+import Test.QuickCheck.Instances()
+import GHC.Generics
+
+------------------------------------------------
+-- QUICK CHECK DERIVING
+
+class PArbitrary a where
+ parbitrary :: Gen a
+ default parbitrary :: (Generic a, GArbitrary (Rep a)) => Gen a
+ parbitrary = to <$> garbitrary
+
+class GArbitrary f where
+ garbitrary :: Gen (f a)
+
+instance GArbitrary U1 where
+ garbitrary = pure U1
+
+instance (GArbitrary a, GArbitrary b) => GArbitrary (a :*: b) where
+ garbitrary = sized $
+   \n -> resize (n+1) $ (:*:) <$> garbitrary <*> garbitrary
+
+sizeLimit :: Int
+sizeLimit = 15
+
+instance (GArbitrary a, GArbitrary b) => GArbitrary (a :+: b) where
+ garbitrary = sized $
+     \n -> if n > sizeLimit
+              then L1 <$> garbitrary
+              else oneof [L1 <$> garbitrary, R1 <$> garbitrary]
+
+instance GArbitrary a => GArbitrary (M1 i c a) where
+ garbitrary = M1 <$> garbitrary
+
+instance PArbitrary a => GArbitrary (K1 i a) where
+ garbitrary = K1 <$> parbitrary
+
+------------------------------------------------
+-- DEFAULT INSTANCES
+
+instance Arbitrary a => PArbitrary (Maybe a) where
+ parbitrary = arbitrary
+
+instance Arbitrary a => PArbitrary (Seq.Seq a) where
+ parbitrary = arbitrary
+
+instance PArbitrary Int where
+ parbitrary = arbitrary
+
+instance PArbitrary Float where
+ parbitrary = arbitrary
+
+instance PArbitrary Text where
+ parbitrary = pack <$> vectorOf 4 parbitrary
+
+instance PArbitrary Char where
+ parbitrary = oneof $ fmap pure [ 'a' .. 'z' ]
+
+instance Arbitrary a => PArbitrary [a] where
+ parbitrary = arbitrary
+
+------------------------------------------------
 
 -- | The /preamble/ is the code that is executed
 --   at the beginning of the script.
@@ -157,7 +222,9 @@ data Proc_Bool =
    | KeyCode_Eq Proc_KeyCode Proc_KeyCode
    -- Conditional
  | Bool_Cond Proc_Bool Proc_Bool Proc_Bool
-     deriving (Eq,Ord)
+     deriving (Eq,Ord,Generic)
+
+instance PArbitrary Proc_Bool
 
 instance Extended Bool Proc_Bool where
  extend True  = Proc_True 
@@ -266,7 +333,9 @@ data Proc_Int =
  | Int_Round Proc_Float
    -- Conditional
  | Int_Cond Proc_Bool Proc_Int Proc_Int
-   deriving Eq
+   deriving (Eq,Ord,Generic)
+
+instance PArbitrary Proc_Int
 
 instance Extended Int Proc_Int where
  extend = Proc_Int
@@ -300,11 +369,6 @@ pround :: Proc_Float -> Proc_Int
 pround (Proc_Float x) = Proc_Int $ round x
 pround x = Int_Round x
 
-instance Ord Proc_Int where
- n <= m = case liftA2 (<=) (patmatch n) (patmatch m) of
-   Nothing -> error "Proc_Int: (<=) applied to a variable."
-   Just b -> b
-
 instance Enum Proc_Int where
  toEnum = fromInt
  fromEnum n = case patmatch n of
@@ -330,7 +394,7 @@ instance Real Proc_Int where
 instance Integral Proc_Int where
  div = extendop div Int_Divide
  mod = extendop mod Int_Mod
- divMod n d = (div n d, mod n d)
+ quotRem n d = (div n d, mod n d)
  toInteger n = case patmatch n of
    Nothing -> error "Proc_Int: toInteger applied to a variable."
    Just i  -> toInteger i
@@ -365,7 +429,9 @@ data Proc_Float =
  | Float_Random Proc_Float Proc_Float
    -- Conditional
  | Float_Cond Proc_Bool Proc_Float Proc_Float
-   deriving (Eq,Ord)
+   deriving (Eq,Ord,Generic)
+
+instance PArbitrary Proc_Float
 
 instance Extended Float Proc_Float where
  extend = Proc_Float
@@ -414,7 +480,7 @@ instance Pretty Proc_Float where
  ppr (Float_Arccosine x) = pfunction "acos" [ppr x]
  ppr (Float_Arctangent x) = pfunction "atan" [ppr x]
  ppr (Float_Floor x) = pfunction "floor" [ppr x]
- ppr (Float_Round x) = pfunction "found" [ppr x]
+ ppr (Float_Round x) = pfunction "round" [ppr x]
  ppr (Float_Noise x y) = pfunction "noise" [ppr x,ppr y]
  ppr (Float_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
  ppr (Float_Random x y) = pfunction "random" [ppr x,ppr y]
@@ -477,7 +543,9 @@ instance Floating Proc_Float where
 data Proc_Image =
    Image_Var Text
  | Image_Cond Proc_Bool Proc_Image Proc_Image
-   deriving Eq
+   deriving (Eq,Generic)
+
+instance PArbitrary Proc_Image
 
 instance Pretty Proc_Image where
  ppr (Image_Var t) = fromText t
@@ -488,7 +556,9 @@ data Proc_Char =
    Proc_Char Char
  | Char_Var Text
  | Char_Cond Proc_Bool Proc_Char Proc_Char
-   deriving (Eq,Ord)
+   deriving (Eq,Ord,Generic)
+
+instance PArbitrary Proc_Char
 
 instance Extended Char Proc_Char where
  extend = Proc_Char
@@ -510,7 +580,9 @@ data Proc_Text =
  | Text_Var Text
    -- Conditional
  | Text_Cond Proc_Bool Proc_Text Proc_Text
-   deriving (Eq,Ord)
+   deriving (Eq,Ord,Generic)
+
+instance PArbitrary Proc_Text
 
 instance Extended Text Proc_Text where
  extend = Proc_Text
@@ -536,7 +608,9 @@ data Proc_Key =
    Key_Var
  | Key_CODED
  | Key_Char Char
-   deriving (Eq,Ord)
+   deriving (Eq,Ord,Generic)
+
+instance PArbitrary Proc_Key
 
 instance Pretty Proc_Key where
  ppr Key_Var = fromText "key"
@@ -559,7 +633,9 @@ data Proc_KeyCode =
  | KeyCode_RETURN
  | KeyCode_ESC
  | KeyCode_DELETE
-   deriving (Eq,Ord)
+   deriving (Eq,Ord,Generic)
+
+instance PArbitrary Proc_KeyCode
 
 instance Pretty Proc_KeyCode where
  ppr KeyCode_Var = fromText "keyCode"
@@ -593,7 +669,12 @@ data ProcCode c =
               (ProcCode c) -- ELSE
  | Comment Text
  | Sequence (Seq.Seq (ProcCode c))
-   deriving Eq
+   deriving (Generic,Eq)
+
+instance PArbitrary (ProcCode c)
+
+instance Arbitrary (ProcCode c) where
+ arbitrary = parbitrary
 
 instance Pretty (ProcCode c) where
  ppr (Command n as) = pfunction n (fmap ppr as) <+> fromText ";"
@@ -660,7 +741,12 @@ data ProcArg =
  | ImageArg Proc_Image
  | TextArg  Proc_Text
  | CharArg  Proc_Char
-   deriving Eq
+   deriving (Eq,Generic)
+
+instance PArbitrary ProcArg
+
+instance Arbitrary ProcArg where
+ arbitrary = parbitrary
 
 instance Pretty ProcArg where
  ppr (BoolArg  b) = ppr b
@@ -678,7 +764,9 @@ data ProcAsign =
  | ImageAsign Text Proc_Image
  | TextAsign  Text Proc_Text
  | CharAsign  Text Proc_Char
-   deriving Eq
+   deriving (Eq,Generic)
+
+instance PArbitrary ProcAsign
 
 instance Pretty ProcAsign where
  ppr (BoolAsign  n b) = fromText n <+> fromText "=" <+> ppr b
@@ -933,7 +1021,12 @@ data ProcScript = ProcScript
  , proc_mouseClicked :: Maybe (ProcCode MouseClicked)
  , proc_mouseReleased :: Maybe (ProcCode MouseReleased)
  , proc_keyPressed :: Maybe (ProcCode KeyPressed)
-   }
+   } deriving (Eq,Generic)
+
+instance PArbitrary ProcScript
+
+instance Arbitrary ProcScript where
+ arbitrary = parbitrary
 
 -- | Empty script.
 emptyScript :: ProcScript
@@ -961,3 +1054,4 @@ instance Pretty ProcScript where
    , pvoid "mouseReleased" $ proc_mouseReleased ps
    , pvoid "keyPressed" $ proc_keyPressed ps
      ]
+

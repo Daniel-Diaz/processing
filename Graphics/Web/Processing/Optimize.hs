@@ -3,8 +3,11 @@
 
 -- | Code optimization module.
 module Graphics.Web.Processing.Optimize (
-   -- * Optimizations
+   -- * Substitution Optimization
+   -- ** Algorithm
    optimizeBySubstitution
+   -- ** Properties
+ , prop_optimizeBySubstitution_projection
    ) where
 
 import Graphics.Web.Processing.Core.Primal
@@ -83,10 +86,13 @@ occurNumber = 3
 isExpensive :: Proc_Float -> Bool
 isExpensive = (> limitNumber) . numOps
 
+{- Currently unused
+
 -- | Check if a 'Proc_Float' calculation is cheap,
 --   depending on 'limitNumber'.
 isCheap :: Proc_Float -> Bool
 isCheap = not . isExpensive
+-}
 
 type FloatSet = MultiSet Proc_Float
 
@@ -303,3 +309,13 @@ subsComment :: ProcCode Preamble -> ProcCode Preamble
 subsComment c =
  if c == mempty then mempty
                 else Comment "Variables from the Substitution Optimization." <> c
+
+-- | Optimizations are projections, i.e.
+--
+-- > let f = optimizeBySubstitution
+-- > in  f x == f (f x)
+prop_optimizeBySubstitution_projection :: ProcScript -> Bool
+prop_optimizeBySubstitution_projection x =
+ let f = optimizeBySubstitution
+     y = f x
+ in  y == f y
