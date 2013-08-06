@@ -117,16 +117,16 @@ class ProcMonad m where
 --
 --   will draw a point at (10,20).
 instance ProcMonad ProcM where
- commandM n as = ProcM $ lift $ tell $ command n as
- assignM = ProcM . lift . tell . assignment
- createVarM = ProcM . lift . tell . createVar
- writeComment = ProcM . lift . tell . comment
+ commandM n as = ProcM $ lift $ tell $ Command n as
+ assignM = ProcM . lift . tell . Assignment
+ createVarM = ProcM . lift . tell . CreateVar
+ writeComment = ProcM . lift . tell . Comment
  iff b (ProcM e1) (ProcM e2) = ProcM $ do
    i0 <- get
    let (i1,c1) = runWriter $ execStateT e1 i0
        (i2,c2) = runWriter $ execStateT e2 i1
    put i2
-   lift $ tell $ conditional b c1 c2
+   lift $ tell $ Conditional b c1 c2
  liftProc = id
  newVar x = do
    n <- newVarNumber

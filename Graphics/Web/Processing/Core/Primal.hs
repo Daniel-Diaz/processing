@@ -3,8 +3,10 @@
              DeriveGeneric, TypeOperators, DefaultSignatures, FlexibleContexts
   #-}
 
--- | Internal module. Mostly for type definitions
---   and class instances.
+{- | Internal core module.
+The purpose of this module is to define the most basic types
+and write the necessary instances for them.
+-}
 module Graphics.Web.Processing.Core.Primal (
   -- * Types
   -- ** Singleton types
@@ -47,22 +49,10 @@ module Graphics.Web.Processing.Core.Primal (
   -- ** Script
   , ProcCode (..), ProcArg (..), ProcAsign (..)
   , emptyCode
-  , command , assignment, createVar, comment
-  , conditional
   , (>>.)
   , ProcScript (..)
   , emptyScript
   ) where
-
-{- Notes on this module
-
-This module needs some work to be refactored, probably
-in different submodules. Currently, it's getting too long
-and is potentially going to grow even more. Also, it has
-code for unrelated tasks: types, code reduction, variables,
-events, etc. I think 'Reducible' deserves a module by itself.
-
--}
 
 import Prelude hiding (foldr)
 import Data.Text (Text,lines,pack)
@@ -80,6 +70,31 @@ import GHC.Generics
 
 ------------------------------------------------
 -- QUICK CHECK DERIVING
+
+{-
+
+Some of the types defined in this module have a big
+amount of data constructors. Creating Arbitrary instances
+for each of them manually is a tedious and unnecessary work.
+
+In order to be able to derive automatically instance for
+the arbitrary typeclass, we create a new class, PArbitrary
+(from Processing Arbitrary). Having access to the class
+definition, we can provide a default instance based in our
+generic deriving. Once an instance to PArbitrary is done,
+the Arbitrary instance is trivial:
+
+instance Arbitrary a where
+ arbitrary = parbitrary
+
+Given the number of data constructors, and being most of them
+recursive, if we create totally random values, the chances of
+creating (insanely) huge values is very high. To avoid it, we
+set a maximum number of random steps (see 'sizeLimit'). When
+this number is reached, we "travel" to the left-most constructor,
+which by definition will be finite (something like Proc_Float Float).
+
+-}
 
 class PArbitrary a where
  parbitrary :: Gen a
@@ -137,6 +152,25 @@ instance Arbitrary a => PArbitrary [a] where
 
 ------------------------------------------------
 
+{-
+Processing.js code is divided in different sections.
+Each section handles a different event. Naturally,
+there are commands that may be called inside of a
+particular context, but not within another. Most of
+these commands are runnable in different kind of
+events. Writing variables should be possible from
+any event. To handle this situation, we annotate
+the AST with a /context/. This context indicates
+which event that portion of code belongs to. For
+example, @ProcCode Draw@ indicates that the code
+belongs to the draw loop. Now we can restrict
+functions to work only under certain contexts.
+For example, variables should be created only once.
+Since events may be called several times, we restrict
+the type of any function that creates variables,
+annotating the type with 'Preamble'.
+-}
+
 -- | The /preamble/ is the code that is executed
 --   at the beginning of the script.
 data Preamble = Preamble
@@ -164,25 +198,73 @@ pfunction n as = fromText n <> parens (commasep as)
 
 -- TYPES
 
+{-
+
+Some Proc_* types can be seen as extensions
+of some Haskell types. For example Proc_Float
+may contain a Float under the Proc_Float data
+constructor.  However, it has more data constructors
+and, therefore, it may contain other different
+values. The Extended class is created for
+these types. It provides two methods that, once
+defined, permit to extend functions and operators
+from the type that has been extended to the extension.
+For example, we can extend the sin function, which
+is defined for Float values, to value of the type
+Proc_Float.
+
+The two methods required are extend and patmatch
+(pattern match). The method extend should inject
+a value from the extended type to the extension.
+The method patmatch would do the opposite. However,
+not every element in the extension belongs to the
+extended type. We return Nothing in those cases.
+
+Extended functions and operators behave the same
+way as the originals for values in the extended
+type. A supplied default function/operator
+indicates what to do in the rest of cases.
+
+-}
+
 class Extended from to | to -> from where
  extend :: from -> to
  patmatch :: to -> Maybe from
 
-extendf :: Extended from to
-        => (from -> from) -> (to -> to) -> (to -> to)
+-- | Function extension.
+extendf :: (Extended from to, Extended from' to')
+        => (from -> from') -> (to -> to') -> (to -> to')
 extendf f g x =
   case patmatch x of
     Nothing -> g x
     Just a  -> extend $ f a
 
-extendop :: Extended from to
-         => (from -> from -> from)
-         -> (to   -> to   -> to)
-         -> (to   -> to   -> to)
+-- | Operator extension.
+extendop :: (Extended from   to
+            ,Extended from'  to'
+            ,Extended from'' to'')
+         => (from -> from' -> from'')
+         -> (to   -> to'   -> to'')
+         -> (to   -> to'   -> to'')
 extendop f g x y =
   case (patmatch x, patmatch y) of
     (Just a, Just b) -> extend $ f a b
     _ -> g x y
+
+{- Proc_* types
+
+Proc_* types are AST's for different kind
+of expressions. For example, a value of type
+Proc_Bool store an AST of a boolean expression.
+The "Proc_" prefix indicates that the type
+of the expression matches a type in Processing.
+
+Extension types have a specialized version of
+'extend'. This way, the Extended class can be
+kept hidden to the user. If this is or not a
+good idea is something to be discussed.
+
+-}
 
 -- | Boolean values.
 data Proc_Bool =
@@ -253,9 +335,16 @@ docGE = fromText ">="
 docG :: Doc
 docG = fromText ">"
 
+-- | Processing.js syntax for conditionals.
+--
+-- > <bool> ? <a> : <a>
+--
 docCond :: Doc -> Doc -> Doc -> Doc
 docCond _if _then _else = _if <+> fromText "?" <+> _then <+> fromText ":" <+> _else
 
+-- | This constant indicates how many spaces
+--   are added in each indentation. Events
+--   and conditionals add indentation.
 indentLevel :: Int
 indentLevel = 3
 
@@ -361,13 +450,11 @@ fromInt = extend
 
 -- | Calculate the 'floor' of a 'Proc_Float'.
 pfloor :: Proc_Float -> Proc_Int
-pfloor (Proc_Float x) = Proc_Int $ floor x
-pfloor x = Int_Floor x
+pfloor = extendf floor Int_Floor
 
 -- | Round a number to the closest integer.
 pround :: Proc_Float -> Proc_Int
-pround (Proc_Float x) = Proc_Int $ round x
-pround x = Int_Round x
+pround = extendf round Int_Round
 
 instance Enum Proc_Int where
  toEnum = fromInt
@@ -521,7 +608,8 @@ instance Fractional Proc_Float where
  fromRational = fromFloat . fromRational
 
 -- | WARNING: 'sinh', 'cosh', 'asinh', 'acosh' and 'atanh'
---   methods are undefined.
+--   methods are undefined. They are not present in
+--   processing.js.
 instance Floating Proc_Float where
  pi = extend pi
  exp = extendf exp Float_Exp
@@ -659,7 +747,8 @@ instance Pretty Proc_KeyCode where
 --   The type parameter indicates what the
 --   context of the code is.
 --   This context will allow or disallow
---   the use of certain commands.
+--   the use of certain commands along
+--   different events.
 data ProcCode c = 
    Command Text [ProcArg] 
  | CreateVar ProcAsign
@@ -691,38 +780,18 @@ instance Pretty (ProcCode c) where
    if Seq.null sq then Text.PrettyPrint.Mainland.empty
                   else foldMap ((<> line) . ppr) sq
 
--- | Code for commands.
-command :: Text -- ^ Name of the command.
-        -> [ProcArg] -- ^ Arguments.
-        -> ProcCode c -- ^ Code result.
-command = Command
-
--- | Code for assignments.
-assignment :: ProcAsign -- ^ Assignment.
-           -> ProcCode c -- ^ Code result.
-assignment = Assignment
-
--- | Code for variable creation.
-createVar :: ProcAsign -- ^ Initial assignment.
-          -> ProcCode c -- ^ Code result.
-createVar = CreateVar
-
--- | Code for comments.
-comment :: Text -> ProcCode c
-comment = Comment
-
--- | Code for conditionals.
-conditional :: Proc_Bool -> ProcCode c -> ProcCode c -> ProcCode c
-conditional = Conditional
-
 -- | Sequence to pieces of code with the same
 --   context type. This way, code that belongs
 --   to different parts of the program will
 --   never get mixed.
 (>>.) :: ProcCode c -> ProcCode c -> ProcCode c
 (Sequence xs) >>. (Sequence ys) = Sequence $ xs Seq.>< ys
-(Sequence xs) >>. p = Sequence $ xs Seq.|> p
-p >>. (Sequence xs) = Sequence $ p Seq.<| xs
+(Sequence xs) >>. p = if Seq.null xs 
+                         then p
+                         else Sequence $ xs Seq.|> p
+p >>. (Sequence xs) = if Seq.null xs
+                         then p
+                         else Sequence $ p Seq.<| xs
 p >>. q = Sequence $ Seq.fromList [p,q]
 
 -- | An empty piece of code.
@@ -950,11 +1019,15 @@ operations.
 
 instance Reducible Proc_Float where
  reduce (Float_Sum x y) =
-   if x == y then 2 * reduce x
-             else reduce x + reduce y
+   if x == y
+      -- x+x = 2*x
+      then 2 * reduce x
+      else reduce x + reduce y
  reduce (Float_Substract x y) =
-   if x == y then 0
-             else reduce x - reduce y
+   if x == y
+      -- x-x = 0
+      then 0
+      else reduce x - reduce y
  reduce (Float_Mult x y) =
    if x == y
       -- x*x = x^2
