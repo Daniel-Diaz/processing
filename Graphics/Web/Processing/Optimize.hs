@@ -286,6 +286,10 @@ subsOptimize n c = runSubstitution n $ codeSubstitution c >> applySubstitution
 --   create variables for them so they are only calculated once.
 --
 --   This optimization is applied automatically when using 'execScriptM'.
+--
+--   Look at the generated to code to see which substitutions have been made.
+--   They are delimited by comments, with title /Substitution Optimization settings/.
+--   If this is not present, no substitution has been made.
 optimizeBySubstitution :: ProcScript -> ProcScript
 optimizeBySubstitution
   (ProcScript _preamble
