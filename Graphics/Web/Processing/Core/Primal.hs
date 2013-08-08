@@ -497,6 +497,7 @@ data Proc_Float =
  | Float_Divide Proc_Float Proc_Float
  | Float_Mult Proc_Float Proc_Float
  | Float_Mod Proc_Float Proc_Float
+ | Float_Neg Proc_Float
    -- Variables
  | Float_Var Text
    -- Functions
@@ -532,6 +533,7 @@ recFloat f (Float_Sum x y) = Float_Sum (f x) (f y)
 recFloat f (Float_Substract x y) = Float_Substract (f x) (f y)
 recFloat f (Float_Divide x y) = Float_Divide (f x) (f y)
 recFloat f (Float_Mult x y) = Float_Mult (f x) (f y)
+recFloat f (Float_Neg x) = Float_Neg $ f x
 recFloat f (Float_Mod x y) = Float_Mod (f x) (f y)
 recFloat f (Float_Abs x) = Float_Abs $ f x
 recFloat f (Float_Exp x) = Float_Exp $ f x
@@ -555,6 +557,7 @@ instance Pretty Proc_Float where
  ppr (Float_Substract x y) = parens $ ppr x <> fromText "-" <> ppr y
  ppr (Float_Divide x y) = parens $ ppr x <> fromText "/" <> ppr y
  ppr (Float_Mult x y) = parens $ ppr x <> fromText "*" <> ppr y
+ ppr (Float_Neg x) = fromText "-" <> ppr x
  ppr (Float_Mod x y) = parens $ ppr x <> fromText "%" <> ppr y
  ppr (Float_Var t) = fromText t
  ppr (Float_Abs x) = pfunction "abs" [ppr x]
@@ -601,6 +604,7 @@ instance Num Proc_Float where
  (-) = extendop (-) Float_Substract
  (*) = extendop (*) Float_Mult
  abs = extendf abs Float_Abs
+ negate = extendf negate Float_Neg
  signum = error "Proc_Float: signum method is undefined."
 
 instance Fractional Proc_Float where

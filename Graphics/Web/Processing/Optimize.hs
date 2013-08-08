@@ -45,6 +45,7 @@ numOps (Float_Sum x y) = 1 + numOps x + numOps y
 numOps (Float_Substract x y) = 1 + numOps x + numOps y
 numOps (Float_Divide x y) = 1 + numOps x + numOps y
 numOps (Float_Mult x y) = 1 + numOps x + numOps y
+numOps (Float_Neg x) = 1 + numOps x
 numOps (Float_Mod x y) = 1 + numOps x + numOps y
 numOps (Float_Abs x) = 1 + numOps x
 numOps (Float_Exp x) = 1 + numOps x
@@ -92,6 +93,7 @@ isExpensive = (> limitNumber) . numOps
 --   depending on 'limitNumber'.
 isCheap :: Proc_Float -> Bool
 isCheap = not . isExpensive
+
 -}
 
 type FloatSet = MultiSet Proc_Float
@@ -110,6 +112,7 @@ browseFloat f@(Float_Sum x y) = addFloat f >> browseFloat x >> browseFloat y
 browseFloat f@(Float_Substract x y) = addFloat f >> browseFloat x >> browseFloat y
 browseFloat f@(Float_Divide x y) = addFloat f >> browseFloat x >> browseFloat y
 browseFloat f@(Float_Mult x y) = addFloat f >> browseFloat x >> browseFloat y
+browseFloat f@(Float_Neg x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Mod x y) = addFloat f >> browseFloat x >> browseFloat y
 browseFloat f@(Float_Abs x) = addFloat f >> browseFloat x
 browseFloat f@(Float_Exp x) = addFloat f >> browseFloat x
@@ -316,6 +319,9 @@ subsComment c =
 -- > in  f x == f (f x)
 --
 --   This function checks that this equality holds for a given @x@.
+--   Apply it to your own script to check that the property is true.
+--   Tests has been applied to randomly generated scripts, but for
+--   them, @f@ ≈ @id@.
 prop_optimizeBySubstitution_projection :: ProcScript -> Bool
 prop_optimizeBySubstitution_projection x =
  let f = optimizeBySubstitution
