@@ -32,7 +32,9 @@ Description:
   .
   The API reference of the library includes guidance and is complemented with
   code examples. Look also to the /examples/ directory included in the source
-  distribution. It contains some fully working examples.
+  distribution. It contains some fully working examples. Also online at:
+  .
+  <https://github.com/Daniel-Diaz/processing/tree/master/examples>
   .
   The library provides different APIs (interfaces). Each one with a different
   philosophy.
@@ -78,6 +80,8 @@ Library
       -- QuickCheck
     , QuickCheck
     , quickcheck-instances
+      -- Template Haskell
+    , template-haskell
   -- Compatibility with previous GHC versions.
   if impl(ghc < 7.6)
      Build-depends: ghc-prim
@@ -100,6 +104,7 @@ Library
     -- HTML
     Graphics.Web.Processing.Html
   Other-modules:
+    Graphics.Web.Processing.Core.TH
     Graphics.Web.Processing.Core.Primal
     Graphics.Web.Processing.Core.Monad
   Extensions: OverloadedStrings

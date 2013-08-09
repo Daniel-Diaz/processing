@@ -1,5 +1,6 @@
 
--- | Collection of types.
+-- | Collection of types (@Proc_*@ types and others), and
+--   some functions on these types as well.
 module Graphics.Web.Processing.Core.Types (
   -- * Processing Script
     ProcScript (..)
@@ -63,6 +64,10 @@ renderScript = prettyLazyText charsPerLine . ppr
 renderFile :: FilePath -> ProcScript -> IO ()
 renderFile fp = T.writeFile fp . renderScript
 
--- | Conditional value.
+-- | Conditional value. For example:
+--
+-- > if_ (x #> 3) "X is greater than 3."
+-- >              "X is less than or equal to 3."
+--
 if_ :: ProcType a => Proc_Bool -> a -> a -> a
 if_ = proc_cond

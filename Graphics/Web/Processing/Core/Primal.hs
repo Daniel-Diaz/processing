@@ -1,6 +1,7 @@
 
 {-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, FunctionalDependencies,
-             DeriveGeneric, TypeOperators, DefaultSignatures, FlexibleContexts
+             DeriveGeneric, TypeOperators, DefaultSignatures, FlexibleContexts,
+             TemplateHaskell
   #-}
 
 {- | Internal core module.
@@ -66,7 +67,9 @@ import Text.PrettyPrint.Mainland
 -- QuickCheck
 import Test.QuickCheck (Arbitrary (..), Gen, oneof, sized, resize, vectorOf)
 import Test.QuickCheck.Instances()
+-- Meta-programming
 import GHC.Generics
+import Graphics.Web.Processing.Core.TH
 
 ------------------------------------------------
 -- QUICK CHECK DERIVING
@@ -667,6 +670,9 @@ instance Pretty Proc_Char where
  ppr (Char_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Type of textual values.
+--
+--   It is recommended to enable the @OverloadedStrings@ extension.
+--   Note that 'Proc_Text' is an instance of the 'IsString' class.
 data Proc_Text =
    Proc_Text Text
  | Text_Var Text
@@ -756,6 +762,7 @@ instance Pretty Proc_KeyCode where
 data ProcCode c = 
    Command Text [ProcArg] 
  | CreateVar ProcAsign
+ -- | CreateArrayVar ProcList
  | Assignment ProcAsign
  | Conditional Proc_Bool   -- IF
               (ProcCode c) -- THEN
@@ -902,41 +909,12 @@ class ProcType a where
  -- | Conditional value.
  proc_cond :: Proc_Bool -> a -> a -> a
 
-instance ProcType Proc_Bool where
- proc_asign = BoolAsign
- proc_arg = BoolArg
- proc_read (Var v) = Bool_Var v
- proc_cond = Bool_Cond
-
-instance ProcType Proc_Int where
- proc_asign = IntAsign
- proc_arg = IntArg
- proc_read (Var v) = Int_Var v
- proc_cond = Int_Cond
-
-instance ProcType Proc_Float where
- proc_asign = FloatAsign
- proc_arg = FloatArg
- proc_read (Var v) = Float_Var v
- proc_cond = Float_Cond
-
-instance ProcType Proc_Image where
- proc_asign = ImageAsign
- proc_arg = ImageArg
- proc_read (Var v) = Image_Var v
- proc_cond = Image_Cond
-
-instance ProcType Proc_Char where
- proc_asign = CharAsign
- proc_arg = CharArg
- proc_read (Var v) = Char_Var v
- proc_cond = Char_Cond
-
-instance ProcType Proc_Text where
- proc_asign =  TextAsign
- proc_arg = TextArg
- proc_read (Var v) = Text_Var v
- proc_cond = Text_Cond
+$(procTypeInst "Bool")
+$(procTypeInst "Int")
+$(procTypeInst "Float")
+$(procTypeInst "Image")
+$(procTypeInst "Char")
+$(procTypeInst "Text")
 
 infix 4 #==, #/=
 
