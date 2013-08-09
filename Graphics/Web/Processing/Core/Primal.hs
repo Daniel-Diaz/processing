@@ -49,7 +49,7 @@ module Graphics.Web.Processing.Core.Primal (
   -- ** Variables
   , Var, varName, varFromText
   -- ** Script
-  , ProcCode (..), ProcArg (..), ProcAsign (..)
+  , ProcCode (..), ProcArg (..), ProcAssign (..)
   , emptyCode
   , (>>.)
   , ProcScript (..)
@@ -744,6 +744,46 @@ instance Pretty Proc_KeyCode where
  ppr KeyCode_ESC = fromText "ESC"
  ppr KeyCode_DELETE = fromText "DELETE"
 
+
+-- END OF PROC_* TYPES
+----------------------------------------------
+----------------------------------------------
+
+{- Proc_* types mechanics
+
+Two types are automatically generated for the
+Proc_* types. These are ProcArg and ProcAssign.
+A processing command may receive several arguments
+of the same or different Proc_* types.
+We encode arguments under the ProcArg type. The
+ProcArg type is the disjoint union of the different
+Proc_* types. For a complete list, see the
+Graphics.Web.Processing.Core.TH module.
+
+In the other hand, variable assignments are also
+encoded in a particular type, named ProcAssign.
+The ProcAssign type is the disjoint union of the
+product of each Proc_* type with Text. This means
+that a value of this type contains a value of any
+of the different Proc_* types together with a value
+of type Text. This text represents the name of the
+variable in the assignment.
+
+Both ProcArg and ProcAssign are generated
+automatically, together with instances of the
+Pretty class.
+
+-}
+
+$(procTypeMechs)
+
+instance PArbitrary ProcArg
+
+instance Arbitrary ProcArg where
+ arbitrary = parbitrary
+
+instance PArbitrary ProcAssign
+
 -- CODE
 
 -- | A piece of Processing code.
@@ -754,9 +794,9 @@ instance Pretty Proc_KeyCode where
 --   different events.
 data ProcCode c = 
    Command Text [ProcArg] 
- | CreateVar ProcAsign
+ | CreateVar ProcAssign
  -- | CreateArrayVar ProcList
- | Assignment ProcAsign
+ | Assignment ProcAssign
  | Conditional Proc_Bool   -- IF
               (ProcCode c) -- THEN
               (ProcCode c) -- ELSE
@@ -806,51 +846,15 @@ instance Monoid (ProcCode a) where
  mempty = emptyCode
  mappend = (>>.)
 
--- | A command argument.
-data ProcArg =
-   BoolArg  Proc_Bool
- | IntArg   Proc_Int
- | FloatArg Proc_Float
- | ImageArg Proc_Image
- | TextArg  Proc_Text
- | CharArg  Proc_Char
-   deriving (Eq,Generic)
-
-instance PArbitrary ProcArg
-
-instance Arbitrary ProcArg where
- arbitrary = parbitrary
-
--- | Assigments.
-data ProcAsign =
-   BoolAsign  Text Proc_Bool
- | IntAsign   Text Proc_Int
- | FloatAsign Text Proc_Float
- | ImageAsign Text Proc_Image
- | TextAsign  Text Proc_Text
- | CharAsign  Text Proc_Char
-   deriving (Eq,Generic)
-
-instance PArbitrary ProcAsign
-
-instance Pretty ProcAsign where
- ppr (BoolAsign  n b) = fromText n <+> fromText "=" <+> ppr b
- ppr (IntAsign   n i) = fromText n <+> fromText "=" <+> ppr i
- ppr (FloatAsign n f) = fromText n <+> fromText "=" <+> ppr f
- ppr (ImageAsign n i) = fromText n <+> fromText "=" <+> ppr i
- ppr (TextAsign  n t) = fromText n <+> fromText "=" <+> ppr t
- ppr (CharAsign  n c) = fromText n <+> fromText "=" <+> ppr c
-
 -- | Returns the name of the type (processing version) in an assignment.
-ptype :: ProcAsign -> Doc
-ptype (BoolAsign  _ _) = fromText "boolean"
-ptype (IntAsign   _ _) = fromText "int"
-ptype (FloatAsign _ _) = fromText "float"
-ptype (ImageAsign _ _) = fromText "PImage"
-ptype (TextAsign  _ _) = fromText "String"
-ptype (CharAsign  _ _) = fromText "char"
+ptype :: ProcAssign -> Doc
+ptype (BoolAssign  _ _) = fromText "boolean"
+ptype (IntAssign   _ _) = fromText "int"
+ptype (FloatAssign _ _) = fromText "float"
+ptype (ImageAssign _ _) = fromText "PImage"
+ptype (TextAssign  _ _) = fromText "String"
+ptype (CharAssign  _ _) = fromText "char"
 
-$(procArgPrettyInst)
 
 ---- ProcType class and instances
 
@@ -888,7 +892,7 @@ varFromText = Var
 class ProcType a where
  -- | Create a variable assignment, provided
  --   the name of the variable and the value to asign.
- proc_asign :: Text -> a -> ProcAsign
+ proc_asign :: Text -> a -> ProcAssign
  -- | Create an argument for a command.
  proc_arg :: a -> ProcArg
  -- | Variable reading.
@@ -906,12 +910,7 @@ with cabal to see the generated instances.
 
 -}
 
-$(procTypeInst "Bool")
-$(procTypeInst "Int")
-$(procTypeInst "Float")
-$(procTypeInst "Image")
-$(procTypeInst "Char")
-$(procTypeInst "Text")
+$(deriveProcTypeInsts)
 
 {- Eq and Ord classes for Proc_* types
 

@@ -170,7 +170,7 @@ floatsInCode :: ProcCode c -> Seq Proc_Float
 floatsInCode (Command _ xs) = getFloatArgs xs
 floatsInCode (Conditional _ c1 c2) = floatsInCode c1 <> floatsInCode c2
 floatsInCode (Sequence xs) = F.foldMap floatsInCode xs
-floatsInCode (Assignment (FloatAsign _ x)) = Seq.singleton x
+floatsInCode (Assignment (FloatAssign _ x)) = Seq.singleton x
 floatsInCode _ = mempty
 
 -- | Like 'mostFreq', but applied to a piece of code.
@@ -188,7 +188,7 @@ varForExp :: Int -- ^ Substitution variable index.
           -> ProcCode c -- ^ Original code.
           -> (ProcCode c, ProcCode c) -- ^ Assignment and result code.
 varForExp n e c =
- ( Assignment (FloatAsign v e) , codesubs e (Float_Var v) c )
+ ( Assignment (FloatAssign v e) , codesubs e (Float_Var v) c )
    where
      v = optVarName n
 
@@ -209,7 +209,7 @@ codesubs :: Proc_Float -- ^ Origin.
 codesubs o t (Command n xs) = Command n $ fmap (argsubs o t) xs
 codesubs o t (Conditional b c1 c2) = Conditional b (codesubs o t c1) (codesubs o t c2)
 codesubs o t (Sequence xs) = Sequence $ fmap (codesubs o t) xs
-codesubs o t (Assignment (FloatAsign n x)) = Assignment $ FloatAsign n $ floatsubs o t x
+codesubs o t (Assignment (FloatAssign n x)) = Assignment $ FloatAssign n $ floatsubs o t x
 codesubs _ _ c = c
 
 substitutionOver :: Int -> ProcCode c -> (ProcCode c, Int)
@@ -304,7 +304,7 @@ optimizeBySubstitution
         (n3,_mouseClicked')  = maybe (n2,Nothing) (second Just . subsOptimize n2) _mouseClicked
         (n4,_mouseReleased') = maybe (n3,Nothing) (second Just . subsOptimize n3) _mouseReleased
         (n5,_keyPressed')    = maybe (n4,Nothing) (second Just . subsOptimize n4) _keyPressed
-        vs = fmap (\n -> CreateVar $ FloatAsign (optVarName n) 0) [1 .. n5 - 1]
+        vs = fmap (\n -> CreateVar $ FloatAssign (optVarName n) 0) [1 .. n5 - 1]
     in ProcScript (_preamble <> subsComment (mconcat vs))
                    _setup'
                    _draw'

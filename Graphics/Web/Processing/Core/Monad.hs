@@ -84,9 +84,9 @@ class ProcMonad m where
  -- | Internal function to process commands in the target monad.
  commandM :: Text -> [ProcArg] -> m c ()
  -- | Internal function to process asignments in the target monad.
- assignM :: ProcAsign -> m c ()
+ assignM :: ProcAssign -> m c ()
  -- | Internal function to process variable creations in the target monad.
- createVarM :: ProcAsign -> m c ()
+ createVarM :: ProcAssign -> m c ()
  -- | Write a comment in the code.
  writeComment :: Text -> m c ()
  -- | Conditional execution.
