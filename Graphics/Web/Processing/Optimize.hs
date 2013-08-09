@@ -155,7 +155,7 @@ floatsubs :: Proc_Float -- ^ Origin.
           -> Proc_Float -- ^ Target.
           -> Proc_Float -- ^ Expression.
           -> Proc_Float -- ^ Result.
-floatsubs o t x = if x == o then t else recFloat (floatsubs o t) x
+floatsubs o t x = if x == o then t else recursor (floatsubs o t) x
 
 -- | From a list of arguments, create a sequence of the
 --   arguments of type 'Proc_Float' (which may be empty).
@@ -231,7 +231,7 @@ subsPrevComment :: ProcCode c
 subsPrevComment = Comment "Substitution Optimization settings."
 
 subsPostComment :: ProcCode c
-subsPostComment = Comment " "
+subsPostComment = Comment ""
 
 -- Substitution optimization monad.
 

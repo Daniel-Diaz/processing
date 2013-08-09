@@ -16,6 +16,8 @@ module Graphics.Web.Processing.Core.Primal (
     Preamble (..), Setup (..), Draw (..)
   , MouseClicked (..), MouseReleased (..)
   , KeyPressed (..)
+  -- ** Recursive types
+  , Recursive (..)
   -- ** @Proc_*@ types
   -- *** Boolean
   , Proc_Bool (..), fromBool
@@ -26,7 +28,6 @@ module Graphics.Web.Processing.Core.Primal (
   , pfloor, pround
   -- *** Float
   , Proc_Float (..), fromFloat
-  , recFloat
   , intToFloat
   , noisef
   -- *** Image
@@ -254,6 +255,22 @@ extendop f g x y =
     (Just a, Just b) -> extend $ f a b
     _ -> g x y
 
+{- | Class of recursive types.
+
+The 'recursor' function applies the
+given function to every subexpression
+of the same type. For example, this would
+be the recursor over lists:
+
+recursor f [] = []
+recursor f (x:xs) = x : f xs
+
+Instances of Recursive can be derived
+using $(deriveRecursive ''Type).
+-}
+class Recursive a where
+ recursor :: (a -> a) -> a -> a
+
 {- Proc_* types
 
 Proc_* types are AST's for different kind
@@ -378,6 +395,7 @@ instance Pretty Proc_Bool where
  ppr (Text_Eq x y) = ppr x <> fromText "." <> pfunction "equals" [ppr y]
  ppr (Key_Eq x y) = parens $ ppr x <+> docEq <+> ppr y
  ppr (KeyCode_Eq x y) = parens $ ppr x <+> docEq <+> ppr y
+ -- Conditional
  ppr (Bool_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Value of 'True'.
@@ -528,31 +546,6 @@ instance Extended Float Proc_Float where
  extend = Proc_Float
  patmatch (Proc_Float x) = Just x
  patmatch _ = Nothing
-
--- | /Float recursion/. Applies a function to the subexpressions
---   of a 'Proc_Float'.
-recFloat :: (Proc_Float -> Proc_Float) -> Proc_Float -> Proc_Float
-recFloat f (Float_Sum x y) = Float_Sum (f x) (f y)
-recFloat f (Float_Substract x y) = Float_Substract (f x) (f y)
-recFloat f (Float_Divide x y) = Float_Divide (f x) (f y)
-recFloat f (Float_Mult x y) = Float_Mult (f x) (f y)
-recFloat f (Float_Neg x) = Float_Neg $ f x
-recFloat f (Float_Mod x y) = Float_Mod (f x) (f y)
-recFloat f (Float_Abs x) = Float_Abs $ f x
-recFloat f (Float_Exp x) = Float_Exp $ f x
-recFloat f (Float_Sqrt x) = Float_Sqrt $ f x
-recFloat f (Float_Log x) = Float_Log $ f x
-recFloat f (Float_Sine x) = Float_Sine $ f x
-recFloat f (Float_Cosine x) = Float_Cosine $ f x
-recFloat f (Float_Arcsine x) = Float_Arcsine $ f x
-recFloat f (Float_Arccosine x) = Float_Arccosine $ f x
-recFloat f (Float_Arctangent x) = Float_Arctangent $ f x
-recFloat f (Float_Floor x) = Float_Floor $ f x
-recFloat f (Float_Round x) = Float_Round $ f x
-recFloat f (Float_Noise x y) = Float_Noise (f x) (f y)
-recFloat f (Float_Cond b x y) = Float_Cond b (f x) (f y)
-recFloat f (Float_Random x y) = Float_Random (f x) (f y)
-recFloat _ x = x
 
 instance Pretty Proc_Float where 
  ppr (Proc_Float f) = ppr f
@@ -828,14 +821,6 @@ instance PArbitrary ProcArg
 instance Arbitrary ProcArg where
  arbitrary = parbitrary
 
-instance Pretty ProcArg where
- ppr (BoolArg  b) = ppr b
- ppr (IntArg   i) = ppr i
- ppr (FloatArg f) = ppr f
- ppr (ImageArg i) = ppr i
- ppr (TextArg  t) = ppr t
- ppr (CharArg  c) = ppr c
-
 -- | Assigments.
 data ProcAsign =
    BoolAsign  Text Proc_Bool
@@ -864,6 +849,8 @@ ptype (FloatAsign _ _) = fromText "float"
 ptype (ImageAsign _ _) = fromText "PImage"
 ptype (TextAsign  _ _) = fromText "String"
 ptype (CharAsign  _ _) = fromText "char"
+
+$(procArgPrettyInst)
 
 ---- ProcType class and instances
 
@@ -909,12 +896,42 @@ class ProcType a where
  -- | Conditional value.
  proc_cond :: Proc_Bool -> a -> a -> a
 
+{- Template Haskell and Proc_* types.
+
+Template Haskell is used in order to derive instances
+of the ProcType class. These instances consist merely
+in select the appropiate data constructor of the
+appropiate datatype. Use "-f info" when compiling
+with cabal to see the generated instances.
+
+-}
+
 $(procTypeInst "Bool")
 $(procTypeInst "Int")
 $(procTypeInst "Float")
 $(procTypeInst "Image")
 $(procTypeInst "Char")
 $(procTypeInst "Text")
+
+{- Eq and Ord classes for Proc_* types
+
+Since Proc_* types represent expressions,
+they cannot be compared in the usual way.
+We cannot decide if two expressions will reduce
+to the same value. In fact, sometimes they will,
+and sometimes they will not. What we can do is
+to, given two expressions, return a boolean
+expression, which will evaluate to the correct
+value in the appropiate context.
+
+Therefore, we define the Proc_Eq and Proc_Ord
+classes similarly to Eq and Ord, but returning
+a Proc_Bool value instead of a Bool value.
+
+Operators have the same name than their
+analagous, but preceded with #.
+
+-}
 
 infix 4 #==, #/=
 
@@ -972,12 +989,28 @@ instance Proc_Ord Proc_Float where
  (#>=) = Float_GE
  (#>)  = Float_G
 
+{- Proc_* types and recursion
+
+Since some of the Proc_* types are recursive,
+we derive the correspondent instance using
+Template Haskell. Otherwise, they would be
+long and tedious.
+
+-}
+
+$(deriveRecursive ''Proc_Bool)
+$(deriveRecursive ''Proc_Int)
+$(deriveRecursive ''Proc_Float)
+
 -- | Class of reducible types. Values of these
 --   types contain expressions that can be
 --   reducible.
 class Eq a => Reducible a where
  reduce :: a -> a
 
+-- | Find a fix point of the 'reduce' function from
+--   any value. If 'reduce' is well defined, this function
+--   must end.
 iteratedReduce :: Reducible a => a -> a
 iteratedReduce = fst . firstWith (uncurry (==)) . pairing . iterate reduce
  where
@@ -1021,7 +1054,7 @@ instance Reducible Proc_Float where
  -- (x*y)/z = x*(y/z)
  reduce (Float_Divide (Float_Mult x (Proc_Float y)) (Proc_Float z)) =
    reduce $ (x*) $ Proc_Float $ y / z
- reduce x = recFloat reduce x
+ reduce x = recursor reduce x
 
 instance Reducible ProcArg where
  reduce (FloatArg x) = FloatArg $ iteratedReduce x
@@ -1109,4 +1142,3 @@ instance Pretty ProcScript where
    , pvoid "mouseReleased" $ proc_mouseReleased ps
    , pvoid "keyPressed" $ proc_keyPressed ps
      ]
-
