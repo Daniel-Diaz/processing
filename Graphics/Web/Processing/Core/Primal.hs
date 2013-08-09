@@ -279,10 +279,11 @@ Proc_Bool store an AST of a boolean expression.
 The "Proc_" prefix indicates that the type
 of the expression matches a type in Processing.
 
-Extension types have a specialized version of
+Proc_* types have a specialized version of
 'extend'. This way, the Extended class can be
 kept hidden to the user. If this is or not a
 good idea is something to be discussed.
+Note that the class use Functional Dependencies.
 
 -}
 
@@ -759,6 +760,7 @@ We encode arguments under the ProcArg type. The
 ProcArg type is the disjoint union of the different
 Proc_* types. For a complete list, see the
 Graphics.Web.Processing.Core.TH module.
+The list is called procTypeNames.
 
 In the other hand, variable assignments are also
 encoded in a particular type, named ProcAssign.
@@ -771,7 +773,9 @@ variable in the assignment.
 
 Both ProcArg and ProcAssign are generated
 automatically, together with instances of the
-Pretty class.
+Pretty class, by procTypeMechs.
+Compile with "-f info" to see the generated
+code.
 
 -}
 
@@ -991,7 +995,7 @@ instance Proc_Ord Proc_Float where
 {- Proc_* types and recursion
 
 Since some of the Proc_* types are recursive,
-we derive the correspondent instance using
+we derive the correspondent instances using
 Template Haskell. Otherwise, they would be
 long and tedious.
 
@@ -1023,7 +1027,7 @@ iteratedReduce = fst . firstWith (uncurry (==)) . pairing . iterate reduce
 FLOAT REDUCTION
 
 Float is probably the most common argument type.
-Below a case-by-case analysis try to reduce a
+Below a case-by-case analysis tries to reduce a
 float expression to its minimal extension.
 The more we reduce, the more effective
 will be the Processing output code, since we save
