@@ -66,6 +66,10 @@ Source-repository head
   type: git
   location: git@github.com:Daniel-Diaz/processing.git
 
+Flag info
+  Description: Show more information during the compilation.
+  Default: False
+
 Library
   Build-depends:
       base == 4.*
@@ -116,3 +120,5 @@ Library
             -- , DefaultSignatures
             , FlexibleContexts
   GHC-Options: -Wall
+  if flag(info)
+    GHC-Options: -ddump-splices
