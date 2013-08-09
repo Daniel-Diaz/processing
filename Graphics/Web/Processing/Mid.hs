@@ -127,6 +127,7 @@ instance ProcMonad EventM where
    addCode $ iff b (event_code s1) (event_code s2)
  -- Create variables in an event? That should never happen, really.
  createVarM = fail "EventM(createVarM): This error should never be called. Report this as an issue."
+ createArrayVarM = fail "EventM(createArrayVarM): This error should never be called. Report this as an issue."
  writeVar v x = liftProc $ writeVar v x
  readVar v = do
   x <- liftProc $ readVar v
@@ -138,6 +139,7 @@ instance ProcMonad EventM where
   liftProc $ readVar v'
  -- New variable in an event? That should not happen, really.
  newVar = fail "EventM(newVar): This error should never be called. Report this as an issue."
+ newArrayVar = fail "EventM(newArrayVar): This error should never be called. Report this as an issue."
 
 data ScriptState c =
   ScriptState
@@ -179,6 +181,7 @@ instance ProcMonad ScriptM where
  commandM t as = liftProc $ commandM t as
  assignM = liftProc . assignM
  createVarM = liftProc . createVarM
+ createArrayVarM n xs = liftProc $ createArrayVarM n xs
  writeComment = liftProc . writeComment
  iff b (ScriptM e1) (ScriptM e2) = do
    c0 <- script_code <$> ScriptM get
@@ -192,6 +195,7 @@ instance ProcMonad ScriptM where
    liftProc $ setVarNumber n2
    liftProc $ iff b c1 c2
  newVar = liftProc . newVar
+ newArrayVar = liftProc . newArrayVar
  writeVar v x = liftProc $ writeVar v x
  readVar v = do
    x  <- liftProc $ readVar v

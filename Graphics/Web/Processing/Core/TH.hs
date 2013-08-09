@@ -48,6 +48,16 @@ deriveRecursive t = do
 procTypeNames :: [String]
 procTypeNames = [ "Bool", "Int", "Float", "Image", "Text", "Char" ]
 
+-- | Return the actual name of a type used in processing.js code.
+realName :: String -> String
+realName "Bool" = "boolean"
+realName "Int" = "int"
+realName "Float" = "float"
+realName "Image" = "PImage"
+realName "Text" = "String"
+realName "Char" = "char"
+realName _ = "undefined"
+
 dataProcArg :: Dec
 dataProcArg = DataD [] (mkName "ProcArg") [] (fmap cons procTypeNames) [mkName "Eq",mkName "Generic"]
   where
@@ -60,10 +70,54 @@ dataProcAssign = DataD [] (mkName "ProcAssign") [] (fmap cons procTypeNames) [mk
          [ (NotStrict,ConT $ mkName "Text")
          , (NotStrict,ConT $ mkName $ "Proc_" ++ x)]
 
+ptype :: [Dec]
+ptype = [
+    SigD (mkName "ptype") $ AppT ArrowT (ConT $ mkName "ProcAssign") `AppT` (ConT $ mkName "Doc")
+  , FunD (mkName "ptype") $ fmap cons procTypeNames
+    ]
+ where
+   cons x = Clause [ConP (mkName $ x ++ "Assign") [WildP,WildP]]
+                   (NormalB $ AppE (VarE $ mkName "fromText") $ LitE $ StringL $ realName x) []
+
+ltype :: [Dec]
+ltype = [
+    SigD (mkName "ltype") $ AppT ArrowT (ConT $ mkName "ProcList") `AppT` (ConT $ mkName "Doc")
+  , FunD (mkName "ltype") $ fmap cons procTypeNames
+    ]
+ where
+   cons x = Clause [ConP (mkName $ x ++ "List") [WildP]]
+                   (NormalB $ AppE (VarE $ mkName "fromText") $ LitE $ StringL $ realName x ++ "[]") []
+
+dataProcList :: Dec
+dataProcList = DataD [] (mkName "ProcList") [] (fmap cons procTypeNames) [mkName "Eq",mkName "Generic"]
+  where
+    cons x = NormalC (mkName $ x ++ "List") [(NotStrict,AppT ListT $ ConT $ mkName $ "Proc_" ++ x)]
+
+-- | Pretty instance of ProcList.
+procListPrettyInst :: Dec -> Dec
+procListPrettyInst procList =
+  let DataD _ _ _ cs _ = procList
+      _fmap e1 e2 = AppE (VarE $ mkName "fmap") e1 `AppE` e2
+      _ppr  = VarE $ mkName "ppr"
+      _xs = VarE $ mkName "xs"
+      _fromText = AppE (VarE $ mkName "fromText")
+      _commasep = AppE (VarE $ mkName "commasep")
+      e1 <> e2 = InfixE (Just e1) (VarE $ mkName "<>") (Just e2)
+      leftbr  = _fromText $ LitE $ StringL "{"
+      rightbr = _fromText $ LitE $ StringL "}"
+      defs = fmap (\(NormalC n _) ->
+               Clause [ConP n [VarP $ mkName "xs"]]
+                              (NormalB $ leftbr <> (_commasep $ _fmap _ppr _xs) <> rightbr)
+                              []
+                    ) cs
+      inst = FunD (mkName "ppr") defs
+  in  InstanceD [] (AppT (ConT $ mkName "Pretty") (ConT $ mkName "ProcList")) [inst]
+
 -- | Create 'ProcType' instance for a @Proc_*@ type.
 procTypeInst :: String -> Dec
 procTypeInst n = InstanceD [] (AppT (ConT $ mkName "ProcType") $ ConT $ mkName $ "Proc_" ++ n)
-  [ FunD (mkName "proc_asign") [ Clause [] (NormalB $ ConE $ mkName $ n ++ "Assign") [] ]
+  [ FunD (mkName "proc_assign") [ Clause [] (NormalB $ ConE $ mkName $ n ++ "Assign") [] ]
+  , FunD (mkName "proc_list") [ Clause [] (NormalB $ ConE $ mkName $ n ++ "List") [] ]
   , FunD (mkName "proc_arg"  ) [ Clause [] (NormalB $ ConE $ mkName $ n ++ "Arg"  ) [] ]
   , FunD (mkName "proc_read" ) [ Clause [ConP (mkName "Var") [VarP $ mkName "v"]]
                                ( NormalB $ AppE (ConE $ mkName $ n ++ "_Var")
@@ -104,8 +158,12 @@ procTypeMechs =
  let argp = procArgPrettyInst dataProcArg
  -- ProcAssign Pretty instance
      assignp = procAssignPrettyInst dataProcAssign
+ -- ProcList Pretty instance
+     listp = procListPrettyInst dataProcList
  -- Everything
- in  return $ [ dataProcArg , argp , dataProcAssign , assignp ]
+ in  return $ [ dataProcArg , argp
+              , dataProcAssign , assignp
+              , dataProcList , listp ] ++ ptype ++ ltype
 
 deriveProcTypeInsts :: Q [Dec]
 deriveProcTypeInsts = return $ fmap procTypeInst procTypeNames

@@ -24,7 +24,7 @@ module Graphics.Web.Processing.Core.Primal (
   , true, false
   , pnot, (#||), (#&&)
   -- *** Int
-  , Proc_Int, fromInt
+  , Proc_Int (..), fromInt
   , pfloor, pround
   -- *** Float
   , Proc_Float (..), fromFloat
@@ -48,8 +48,12 @@ module Graphics.Web.Processing.Core.Primal (
   , Reducible (..)
   -- ** Variables
   , Var, varName, varFromText
+  , ArrayVar , arrayVarName, arrayVarFromText
+  , arraySize
+  , arrayVarToVar
   -- ** Script
   , ProcCode (..), ProcArg (..), ProcAssign (..)
+  , ProcList (..)
   , emptyCode
   , (>>.)
   , ProcScript (..)
@@ -58,6 +62,7 @@ module Graphics.Web.Processing.Core.Primal (
 
 import Prelude hiding (foldr)
 import Data.Text (Text,lines,pack)
+import Data.Text.Lazy (toStrict)
 import qualified Data.Sequence as Seq
 import Data.Monoid
 import Data.String
@@ -329,6 +334,9 @@ data Proc_Bool =
 
 instance PArbitrary Proc_Bool
 
+instance Arbitrary Proc_Bool where
+ arbitrary = parbitrary
+
 instance Extended Bool Proc_Bool where
  extend True  = Proc_True 
  extend False = Proc_False
@@ -448,6 +456,9 @@ data Proc_Int =
 
 instance PArbitrary Proc_Int
 
+instance Arbitrary Proc_Int where
+ arbitrary = parbitrary
+
 instance Extended Int Proc_Int where
  extend = Proc_Int
  patmatch (Proc_Int a) = Just a
@@ -543,6 +554,9 @@ data Proc_Float =
 
 instance PArbitrary Proc_Float
 
+instance Arbitrary Proc_Float where
+ arbitrary = parbitrary
+
 instance Extended Float Proc_Float where
  extend = Proc_Float
  patmatch (Proc_Float x) = Just x
@@ -636,6 +650,9 @@ data Proc_Image =
 
 instance PArbitrary Proc_Image
 
+instance Arbitrary Proc_Image where
+ arbitrary = parbitrary
+
 instance Pretty Proc_Image where
  ppr (Image_Var t) = fromText t
  ppr (Image_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
@@ -648,6 +665,9 @@ data Proc_Char =
    deriving (Eq,Ord,Generic)
 
 instance PArbitrary Proc_Char
+
+instance Arbitrary Proc_Char where
+ arbitrary = parbitrary
 
 instance Extended Char Proc_Char where
  extend = Proc_Char
@@ -675,6 +695,8 @@ data Proc_Text =
    deriving (Eq,Ord,Generic)
 
 instance PArbitrary Proc_Text
+
+instance Arbitrary Proc_Text
 
 instance Extended Text Proc_Text where
  extend = Proc_Text
@@ -788,6 +810,8 @@ instance Arbitrary ProcArg where
 
 instance PArbitrary ProcAssign
 
+instance PArbitrary ProcList
+
 -- CODE
 
 -- | A piece of Processing code.
@@ -799,7 +823,7 @@ instance PArbitrary ProcAssign
 data ProcCode c = 
    Command Text [ProcArg] 
  | CreateVar ProcAssign
- -- | CreateArrayVar ProcList
+ | CreateArrayVar Text ProcList
  | Assignment ProcAssign
  | Conditional Proc_Bool   -- IF
               (ProcCode c) -- THEN
@@ -815,7 +839,11 @@ instance Arbitrary (ProcCode c) where
 
 instance Pretty (ProcCode c) where
  ppr (Command n as) = pfunction n (fmap ppr as) <+> fromText ";"
+ -- ptype is defined by $(procTypeMechs).
  ppr (CreateVar a) = ptype a <+> ppr a <+> fromText ";"
+ -- ltype is defined by $(procTypeMechs).
+ ppr (CreateArrayVar n xs) = ltype xs <+> fromText n <+> fromText "="
+                         <+> ppr xs <+> fromText ";"
  ppr (Assignment a) = ppr a <+> fromText ";"
  ppr (Conditional b e1 e2) =
    let c1 = indent indentLevel $ ppr e1
@@ -850,16 +878,6 @@ instance Monoid (ProcCode a) where
  mempty = emptyCode
  mappend = (>>.)
 
--- | Returns the name of the type (processing version) in an assignment.
-ptype :: ProcAssign -> Doc
-ptype (BoolAssign  _ _) = fromText "boolean"
-ptype (IntAssign   _ _) = fromText "int"
-ptype (FloatAssign _ _) = fromText "float"
-ptype (ImageAssign _ _) = fromText "PImage"
-ptype (TextAssign  _ _) = fromText "String"
-ptype (CharAssign  _ _) = fromText "char"
-
-
 ---- ProcType class and instances
 
 -- | Type of variables.
@@ -869,6 +887,24 @@ data Var a = Var { -- | Get the name of a variable.
 -- | Internal function to create variables.
 varFromText :: Text -> Var a
 varFromText = Var
+
+-- | Type of variables storing arrays.
+data ArrayVar a = ArrayVar { arraySize :: Int , innerVar :: Var a }
+
+-- | Get the name of a variable storing an array.
+arrayVarName :: ArrayVar a -> Text
+arrayVarName = varName . innerVar
+
+-- | Internal function to create array variables.
+arrayVarFromText :: Int -> Text -> ArrayVar a
+arrayVarFromText n t = ArrayVar n (Var t)
+
+-- | Translate an Array variable to the correspondent
+--   component variable.
+arrayVarToVar :: ArrayVar a -> Proc_Int -> Var a
+arrayVarToVar v n = varFromText $ arrayVarName v <> "[" <> f n <> "]"
+  where
+   f = toStrict . prettyLazyText 80 . ppr
 
 ----- CLASSES
 
@@ -896,7 +932,9 @@ varFromText = Var
 class ProcType a where
  -- | Create a variable assignment, provided
  --   the name of the variable and the value to asign.
- proc_asign :: Text -> a -> ProcAssign
+ proc_assign :: Text -> a -> ProcAssign
+ -- | Create a list.
+ proc_list :: [a] -> ProcList
  -- | Create an argument for a command.
  proc_arg :: a -> ProcArg
  -- | Variable reading.

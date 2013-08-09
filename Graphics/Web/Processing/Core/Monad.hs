@@ -5,6 +5,8 @@ module Graphics.Web.Processing.Core.Monad (
   , runProcM, execProcM
   , runProcMWith
   , ProcMonad (..)
+  , readArrayVar
+  , writeArrayVar
   , newVarNumber
   , getVarNumber
   , setVarNumber
@@ -87,6 +89,8 @@ class ProcMonad m where
  assignM :: ProcAssign -> m c ()
  -- | Internal function to process variable creations in the target monad.
  createVarM :: ProcAssign -> m c ()
+ -- | Internal function to process array varaible creations in the target monad.
+ createArrayVarM :: Text -> ProcList -> m c ()
  -- | Write a comment in the code.
  writeComment :: Text -> m c ()
  -- | Conditional execution.
@@ -98,6 +102,8 @@ class ProcMonad m where
  liftProc :: ProcM c a -> m c a
  -- | Create a new variable with a starting value.
  newVar :: ProcType a => a -> m Preamble (Var a)
+ -- | Create a new array variable with a starting list of values.
+ newArrayVar :: ProcType a => [a] -> m Preamble (ArrayVar a)
  -- | Read a variable.
  readVar :: ProcType a => Var a -> m c a
  -- | Write a new value to a variable.
@@ -120,6 +126,7 @@ instance ProcMonad ProcM where
  commandM n as = ProcM $ lift $ tell $ Command n as
  assignM = ProcM . lift . tell . Assignment
  createVarM = ProcM . lift . tell . CreateVar
+ createArrayVarM n xs = ProcM $ lift $ tell $ CreateArrayVar n xs
  writeComment = ProcM . lift . tell . Comment
  iff b (ProcM e1) (ProcM e2) = ProcM $ do
    i0 <- get
@@ -131,7 +138,30 @@ instance ProcMonad ProcM where
  newVar x = do
    n <- newVarNumber
    let v = intVarName n
-   createVarM (proc_asign v x)
+   createVarM (proc_assign v x)
    return $ varFromText v
+ newArrayVar xs = do
+   n <- newVarNumber
+   let v = intVarName n
+   createArrayVarM v $ proc_list xs
+   return $ arrayVarFromText (length xs) v
  readVar = return . proc_read
- writeVar v x = assignM $ proc_asign (varName v) x
+ writeVar v x = assignM $ proc_assign (varName v) x
+
+-- | Read a component of an array variable.
+readArrayVar :: (ProcMonad m, Monad (m c), ProcType a) => ArrayVar a -> Proc_Int -> m c a
+readArrayVar v n =
+  case n of
+    Proc_Int i -> let s = arraySize v
+                  in  if (i < 0) || (i >= s)
+                         then fail $ "readArrayVar: index out of bounds.\nArray size: "
+                                  ++ show s
+                                  ++ ".\nIndex given: "
+                                  ++ show i
+                                  ++ ".\nRemember that indices start from 0."
+                         else readVar $ arrayVarToVar v n
+    _ -> readVar $ arrayVarToVar v n
+
+-- | Write a component of an array variable.
+writeArrayVar :: (ProcMonad m, ProcType a) => ArrayVar a -> Proc_Int -> a -> m c ()
+writeArrayVar v n x = writeVar (arrayVarToVar v n) x

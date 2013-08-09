@@ -1,15 +1,17 @@
 
--- | Module exporting 'Var' type and functions.
+-- | Module exporting 'Var' and 'ArrayVar' type and functions.
 module Graphics.Web.Processing.Core.Var (
   -- * Variables
 
   -- $vars
 
     Var
+  , ArrayVar
 
   -- ** Functions
-  , varName
+  , varName, arrayVarName
   , newVar, readVar, writeVar
+  , newArrayVar, readArrayVar, writeArrayVar
     ) where
 
 import Graphics.Web.Processing.Core.Primal
