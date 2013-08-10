@@ -83,6 +83,7 @@ fromCustomVar :: CustomVar a -> [Var a]
 fromCustomVar (CustomVar xs) = fmap varFromText xs
 
 -- This instances are really boring (they are all equal).
+-- Candidate for Template Haskell.
 
 instance CustomValue Proc_Bool where
  newVarC = liftM fromVar . newVar
@@ -114,23 +115,29 @@ instance CustomValue Proc_Char where
  readVarC = readVar . head . fromCustomVar
  writeVarC v x = writeVar (head $ fromCustomVar v) x
 
--- GENERICS
-
 -- | Typeclass of values that can be stored in several
 --   native variables ('Var').
 class VarLength a where
  -- | Calculate how many native variables are needed
  --   to store a value.
  varLength :: a -> Int
- --
- varLength _ = 1
+ default varLength :: (Generic a, GVarLength (Rep a)) => a -> Int
+ varLength = gvarLength . from
 
 instance VarLength Proc_Bool where
+ varLength _ = 1
 instance VarLength Proc_Int where
+ varLength _ = 1
 instance VarLength Proc_Float where
+ varLength _ = 1
 instance VarLength Proc_Text where
+ varLength _ = 1
 instance VarLength Proc_Image where
+ varLength _ = 1
 instance VarLength Proc_Char where
+ varLength _ = 1
+
+-- GENERICS
 
 class GVarLength f where
  gvarLength :: f a -> Int
@@ -177,8 +184,8 @@ instance (GVarLength a, GCustomValue a, GCustomValue b) => GCustomValue (a :*: b
    gwriteVarC (CustomVar ys) b
 
 instance GCustomValue (a :+: b) where
- gnewVarC = error "gnewVarC: Custom variables cannot be sum types."
- greadVarC = error "greadVarC: Custom variables cannot be sum types."
+ gnewVarC   = error   "gnewVarC: Custom variables cannot be sum types."
+ greadVarC  = error  "greadVarC: Custom variables cannot be sum types."
  gwriteVarC = error "gwriteVarC: Custom variables cannot be sum types."
 
 instance GCustomValue a => GCustomValue (M1 i c a) where
