@@ -45,13 +45,22 @@
 --   custom variables for tuples).
 module Graphics.Web.Processing.Mid.CustomVar (
     CustomVar
+  , CustomArrayVar
+  , customArraySize
   , VarLength (..)
   , CustomValue (..)
+  , readArrayVarC
+  , writeArrayVarC
     ) where
 
 import Data.Text (Text)
+import Data.Text.Lazy (toStrict)
+import Text.PrettyPrint.Mainland (ppr, prettyLazyText)
+import Data.Monoid ((<>))
 import Graphics.Web.Processing.Mid
-import Graphics.Web.Processing.Core.Primal (varFromText)
+import Graphics.Web.Processing.Core.Primal
+   (varFromText, ProcArg, proc_arg
+   ,Proc_Int (..))
 import Control.Monad (liftM)
 -- generics
 import GHC.Generics
@@ -59,13 +68,22 @@ import GHC.Generics
 -- | Variable with custom values.
 data CustomVar a = CustomVar [Text] deriving Generic
 
+-- | Modify all the variable names inside a custom variable.
+mapCustomVar :: (Text -> Text) -> CustomVar a -> CustomVar a
+mapCustomVar f (CustomVar xs) = CustomVar (fmap f xs)
+
 -- | Typeclass of custom values, which can be stored in custom variables ('CustomVar').
 class VarLength a => CustomValue a where
  -- | Version of 'newVar' for custom variables.
  newVarC :: (Monad (m Preamble), ProcMonad m) => a -> m Preamble (CustomVar a)
  default newVarC :: (Monad (m Preamble), ProcMonad m, Generic a, GCustomValue (Rep a))
                  => a -> m Preamble (CustomVar a)
- newVarC x = liftM castCVar $ gnewVarC (from x)
+ newVarC = liftM castCVar . gnewVarC . from
+ -- | Version of 'newArrayVar' for custom variables.
+ newArrayVarC :: (Monad (m Preamble), ProcMonad m) => [a] -> m Preamble (CustomArrayVar a)
+ default newArrayVarC :: (Monad (m Preamble), ProcMonad m, Generic a, GCustomValue (Rep a))
+                      => [a] -> m Preamble (CustomArrayVar a)
+ newArrayVarC = liftM castCAVar . gnewArrayVarC . fmap from
  -- | Version of 'readVar' for custom variables.
  readVarC :: (Monad (m c), ProcMonad m) => CustomVar a -> m c a
  default readVarC :: (Monad (m c), ProcMonad m, Generic a, GCustomValue (Rep a))
@@ -75,6 +93,32 @@ class VarLength a => CustomValue a where
  writeVarC :: (Monad (m c), ProcMonad m) => CustomVar a -> a -> m c ()
  default writeVarC :: (Monad (m c), ProcMonad m, Generic a, GCustomValue (Rep a)) => CustomVar a -> a -> m c ()
  writeVarC v x = gwriteVarC (castCVar v) (from x)
+
+-- Maybe this function can be written in terms of arrayVarToVar?
+arrayVarToVarC :: CustomArrayVar a -> Proc_Int -> CustomVar a
+arrayVarToVarC v n = mapCustomVar f $ customInnerVar v
+  where
+   f t = t <> "[" <> (toStrict $ prettyLazyText 80 $ ppr n) <> "]"
+
+-- | Read a component of a custom array variable.
+readArrayVarC :: (ProcMonad m, Monad (m c), CustomValue a)
+              => CustomArrayVar a -> Proc_Int -> m c a
+readArrayVarC v n =
+  case n of
+    Proc_Int i -> let s = customArraySize v
+                  in  if (i < 0) || (i >= s)
+                         then fail $ "readArrayVarC: index out of bounds.\nArray size: "
+                                  ++ show s
+                                  ++ ".\nIndex given: "
+                                  ++ show i
+                                  ++ ".\nRemember that indices start from 0."
+                         else readVarC $ arrayVarToVarC v n
+    _ -> readVarC $ arrayVarToVarC v n
+
+-- | Write a component of a custom array variable.
+writeArrayVarC :: (ProcMonad m, Monad (m c), CustomValue a)
+               => CustomArrayVar a -> Proc_Int -> a -> m c ()
+writeArrayVarC v n x = writeVarC (arrayVarToVarC v n) x
 
 fromVar :: Var a -> CustomVar a
 fromVar = CustomVar . (:[]) . varName
@@ -87,33 +131,50 @@ fromCustomVar (CustomVar xs) = fmap varFromText xs
 
 instance CustomValue Proc_Bool where
  newVarC = liftM fromVar . newVar
+ newArrayVarC = liftM fromArrayVar . newArrayVar
  readVarC = readVar . head . fromCustomVar
  writeVarC v x = writeVar (head $ fromCustomVar v) x
 
 instance CustomValue Proc_Int where
  newVarC = liftM fromVar . newVar
+ newArrayVarC = liftM fromArrayVar . newArrayVar
  readVarC = readVar . head . fromCustomVar
  writeVarC v x = writeVar (head $ fromCustomVar v) x
 
 instance CustomValue Proc_Float where
  newVarC = liftM fromVar . newVar
+ newArrayVarC = liftM fromArrayVar . newArrayVar
  readVarC = readVar . head . fromCustomVar
  writeVarC v x = writeVar (head $ fromCustomVar v) x
 
 instance CustomValue Proc_Text where
  newVarC = liftM fromVar . newVar
+ newArrayVarC = liftM fromArrayVar . newArrayVar
  readVarC = readVar . head . fromCustomVar
  writeVarC v x = writeVar (head $ fromCustomVar v) x
 
 instance CustomValue Proc_Image where
  newVarC = liftM fromVar . newVar
+ newArrayVarC = liftM fromArrayVar . newArrayVar
  readVarC = readVar . head . fromCustomVar
  writeVarC v x = writeVar (head $ fromCustomVar v) x
 
 instance CustomValue Proc_Char where
  newVarC = liftM fromVar . newVar
+ newArrayVarC = liftM fromArrayVar . newArrayVar
  readVarC = readVar . head . fromCustomVar
  writeVarC v x = writeVar (head $ fromCustomVar v) x
+
+-- Custom arrays
+
+data CustomArrayVar a =
+  CustomArrayVar { customArraySize :: Int
+                 , customInnerVar :: CustomVar a
+                   }
+
+fromArrayVar :: ArrayVar a -> CustomArrayVar a
+fromArrayVar v =
+  CustomArrayVar (arraySize v) $ fromVar $ varFromText $ arrayVarName v
 
 -- | Typeclass of values that can be stored in several
 --   native variables ('Var').
@@ -123,39 +184,58 @@ class VarLength a where
  varLength :: a -> Int
  default varLength :: (Generic a, GVarLength (Rep a)) => a -> Int
  varLength = gvarLength . from
+ -- | Get Proc_* type values inside a custom value.
+ getValues :: a -> [ProcArg]
+ default getValues :: (Generic a, GVarLength (Rep a)) => a -> [ProcArg]
+ getValues = ggetValues . from
+
+-- Repetitive instances. Subject to automatize
+-- with Template Haskell.
 
 instance VarLength Proc_Bool where
  varLength _ = 1
+ getValues = (:[]) . proc_arg
 instance VarLength Proc_Int where
  varLength _ = 1
+ getValues = (:[]) . proc_arg
 instance VarLength Proc_Float where
  varLength _ = 1
+ getValues = (:[]) . proc_arg
 instance VarLength Proc_Text where
  varLength _ = 1
+ getValues = (:[]) . proc_arg
 instance VarLength Proc_Image where
  varLength _ = 1
+ getValues = (:[]) . proc_arg
 instance VarLength Proc_Char where
  varLength _ = 1
+ getValues = (:[]) . proc_arg
 
 -- GENERICS
 
 class GVarLength f where
  gvarLength :: f a -> Int
+ ggetValues :: f a -> [ProcArg]
 
 instance GVarLength U1 where
  gvarLength _ = 1
+ ggetValues _ = []
 
 instance (GVarLength a, GVarLength b) => GVarLength (a :*: b) where
- gvarLength (a :*: b) = gvarLength a + gvarLength b
+ gvarLength (a :*: b) = gvarLength a  + gvarLength b
+ ggetValues (a :*: b) = ggetValues a ++ ggetValues b
 
 instance GVarLength (a :+: b) where
- gvarLength _ = error "gvarLength: Custom variables cannot be sum types."
+ gvarLength _ = error "gvarLength: Custom variables cannot contain sum types."
+ ggetValues _ = error "ggetValues: Custom variables cannot contain sum types."
 
 instance GVarLength a => GVarLength (M1 i c a) where
  gvarLength (M1 x) = gvarLength x
+ ggetValues (M1 x) = ggetValues x
 
 instance VarLength a => GVarLength (K1 i a) where
  gvarLength (K1 x) = varLength x
+ ggetValues (K1 x) = getValues x
 
 varDrop :: Int -> CustomVar a -> CustomVar a
 varDrop n (CustomVar xs) = CustomVar $ drop n xs
@@ -163,16 +243,32 @@ varDrop n (CustomVar xs) = CustomVar $ drop n xs
 castCVar :: CustomVar a -> CustomVar b
 castCVar (CustomVar xs) = CustomVar xs
 
+castCAVar :: CustomArrayVar a -> CustomArrayVar b
+castCAVar (CustomArrayVar n v) = CustomArrayVar n $ castCVar v
+
 class GCustomValue f where
  gnewVarC :: (Monad (m Preamble), ProcMonad m) => f a -> m Preamble (CustomVar (f a))
+ gnewArrayVarC :: (Monad (m Preamble), ProcMonad m) => [f a] -> m Preamble (CustomArrayVar (f a))
  greadVarC :: (Monad (m c), ProcMonad m) => CustomVar (f a) -> m c (f a)
  gwriteVarC :: (Monad (m c), ProcMonad m) => CustomVar (f a) -> f a -> m c ()
+
+leftP :: (a :*: b) c -> a c
+leftP (a :*: _) = a
+
+rightP :: (a :*: b) c -> b c
+rightP (_ :*: b) = b
 
 instance (GVarLength a, GCustomValue a, GCustomValue b) => GCustomValue (a :*: b) where
  gnewVarC (a :*: b) = do
    CustomVar xs <- gnewVarC a
    CustomVar ys <- gnewVarC b
    return $ CustomVar $ xs ++ ys
+ gnewArrayVarC l = do
+   let as = fmap leftP  l
+       bs = fmap rightP l
+   CustomArrayVar n (CustomVar xs) <- gnewArrayVarC as
+   CustomArrayVar _ (CustomVar ys) <- gnewArrayVarC bs
+   return $ CustomArrayVar n $ CustomVar $ xs ++ ys
  greadVarC v = do
    a <- greadVarC $ castCVar v
    let n = gvarLength a
@@ -184,17 +280,20 @@ instance (GVarLength a, GCustomValue a, GCustomValue b) => GCustomValue (a :*: b
    gwriteVarC (CustomVar ys) b
 
 instance GCustomValue (a :+: b) where
- gnewVarC   = error   "gnewVarC: Custom variables cannot be sum types."
- greadVarC  = error  "greadVarC: Custom variables cannot be sum types."
- gwriteVarC = error "gwriteVarC: Custom variables cannot be sum types."
+ gnewVarC      = error      "gnewVarC: Custom variables cannot contain sum types."
+ gnewArrayVarC = error "gnewArrayVarC: Custom variables cannot contain sum types."
+ greadVarC     = error     "greadVarC: Custom variables cannot contain sum types."
+ gwriteVarC    = error    "gwriteVarC: Custom variables cannot contain sum types."
 
 instance GCustomValue a => GCustomValue (M1 i c a) where
  gnewVarC (M1 x) = liftM castCVar $ gnewVarC x
+ gnewArrayVarC = liftM castCAVar . gnewArrayVarC . fmap unM1
  greadVarC v = liftM M1 $ greadVarC $ castCVar v
  gwriteVarC v (M1 x) = gwriteVarC (castCVar v) x
 
 instance CustomValue a => GCustomValue (K1 i a) where
  gnewVarC (K1 x) = liftM castCVar $ newVarC x
+ gnewArrayVarC = liftM castCAVar . newArrayVarC . fmap unK1
  greadVarC v = liftM K1 $ readVarC $ castCVar v
  gwriteVarC v (K1 x) = writeVarC (castCVar v) x
 

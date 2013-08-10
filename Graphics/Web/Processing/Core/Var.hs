@@ -7,6 +7,7 @@ module Graphics.Web.Processing.Core.Var (
 
     Var
   , ArrayVar
+  , arraySize
 
   -- ** Functions
   , varName, arrayVarName

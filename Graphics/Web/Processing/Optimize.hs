@@ -267,8 +267,8 @@ codeSubstitution a@(Assignment _) = addToStack a >> applySubstitution
 codeSubstitution (Conditional b c1 c2) = do
   applySubstitution
   n0 <- substitutionIndex <$> get
-  let (n1,c1') = runSubstitution n0 $ codeSubstitution c1
-      (n2,c2') = runSubstitution n1 $ codeSubstitution c2
+  let (n1,c1') = runSubstitution n0 $ codeSubstitution c1 >> applySubstitution
+      (n2,c2') = runSubstitution n1 $ codeSubstitution c2 >> applySubstitution
   setIndex n2
   addToWritten $ Conditional b c1' c2'
 codeSubstitution (Sequence xs) = F.mapM_ codeSubstitution xs

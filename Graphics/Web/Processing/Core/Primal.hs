@@ -48,7 +48,7 @@ module Graphics.Web.Processing.Core.Primal (
   , Reducible (..)
   -- ** Variables
   , Var, varName, varFromText
-  , ArrayVar , arrayVarName, arrayVarFromText
+  , ArrayVar, arrayVarName, arrayVarFromText
   , arraySize
   , arrayVarToVar
   -- ** Script
@@ -515,6 +515,7 @@ instance Integral Proc_Int where
  div = extendop div Int_Divide
  mod = extendop mod Int_Mod
  quotRem n d = (div n d, mod n d)
+ divMod = quotRem
  toInteger n = case patmatch n of
    Nothing -> error "Proc_Int: toInteger applied to a variable."
    Just i  -> toInteger i

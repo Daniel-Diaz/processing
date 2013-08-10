@@ -126,8 +126,8 @@ instance ProcMonad EventM where
    addPCode $ event_preamble s2
    addCode $ iff b (event_code s1) (event_code s2)
  -- Create variables in an event? That should never happen, really.
- createVarM = fail "EventM(createVarM): This error should never be called. Report this as an issue."
- createArrayVarM = fail "EventM(createArrayVarM): This error should never be called. Report this as an issue."
+ createVarM = fail "EventM(createVarM): This error should never be called. Report this as a bug."
+ createArrayVarM = fail "EventM(createArrayVarM): This error should never be called. Report this as a bug."
  writeVar v x = liftProc $ writeVar v x
  readVar v = do
   x <- liftProc $ readVar v
