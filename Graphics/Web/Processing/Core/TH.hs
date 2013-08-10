@@ -6,9 +6,11 @@ module Graphics.Web.Processing.Core.TH (
     deriveRecursive
   , procTypeMechs
   , deriveProcTypeInsts
+  , deriveCustomValues
   ) where
 
 import Language.Haskell.TH
+import Control.Monad
 
 {- RECURSOR -}
 
@@ -167,3 +169,34 @@ procTypeMechs =
 
 deriveProcTypeInsts :: Q [Dec]
 deriveProcTypeInsts = return $ fmap procTypeInst procTypeNames
+
+deriveCustomValues :: Q [Dec]
+deriveCustomValues = do
+  let xs = fmap varLengthInst procTypeNames
+  ys <- mapM customValueInst procTypeNames
+  return $ xs ++ ys
+
+varLengthInst :: String -> Dec
+varLengthInst t = InstanceD [] (AppT (ConT $ mkName "VarLength") (ConT $ mkName $ "Proc_" ++ t)) [
+  FunD (mkName "varLength") [ Clause [WildP] (NormalB $ LitE $ IntegerL 1) [] ]
+  ]
+
+customValueInst :: String -> Q Dec
+customValueInst t = instanceD (return []) [t|$(conT $ mkName "CustomValue") $(conT $ mkName $ "Proc_" ++ t)|]
+  [ funD (mkName "newVarC")
+      [ do b <- fmap NormalB $ [|liftM $(dyn "fromVar") . $(dyn "newVar")|]
+           return $ Clause [] b []
+      ]
+  , funD (mkName "newArrayVarC")
+      [ do b <- fmap NormalB $ [|liftM $(dyn "fromArrayVar") . $(dyn "newArrayVar")|]
+           return $ Clause [] b []
+      ]
+  , funD (mkName "readVarC")
+      [ do b <- fmap NormalB $ [|$(dyn "readVar") . head . $(dyn "fromCustomVar")|]
+           return $ Clause [] b []
+      ]
+  , funD (mkName "writeVarC")
+      [ do b <- fmap NormalB $ [|$(dyn "writeVar") (head $ $(dyn "fromCustomVar") $(dyn "v")) $(dyn "x")|]
+           return $ Clause [VarP (mkName "v"),VarP (mkName "x")] b []
+      ]
+    ]

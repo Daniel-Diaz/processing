@@ -890,7 +890,10 @@ varFromText :: Text -> Var a
 varFromText = Var
 
 -- | Type of variables storing arrays.
-data ArrayVar a = ArrayVar { arraySize :: Int , innerVar :: Var a }
+data ArrayVar a =
+  ArrayVar { -- | Size of the array.
+             arraySize :: Int
+           , innerVar :: Var a }
 
 -- | Get the name of a variable storing an array.
 arrayVarName :: ArrayVar a -> Text

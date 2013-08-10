@@ -1,5 +1,7 @@
 
-{-# LANGUAGE DeriveGeneric, TypeOperators, DefaultSignatures, FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric, TypeOperators, DefaultSignatures, FlexibleContexts,
+             TemplateHaskell
+  #-}
 
 -- | This module implements variables which may contain values from
 --   types different from the native types (@Proc_*@ types).
@@ -38,6 +40,9 @@
 --   variables, except that they all end in @C@. For example, 'newVar' is
 --   called 'newVarC' for custom variables.
 --
+--   There are also arrays which may contain custom values.
+--   See 'CustomArrayVar'.
+--
 --   The dependency of this module in several language extensions was
 --   the reason to make it separate from the rest of the /mid/ interface
 --   where it belongs to. Somehow, it forces the user to use @DeriveGeneric@
@@ -58,12 +63,22 @@ import Data.Text.Lazy (toStrict)
 import Text.PrettyPrint.Mainland (ppr, prettyLazyText)
 import Data.Monoid ((<>))
 import Graphics.Web.Processing.Mid
-import Graphics.Web.Processing.Core.Primal
-   (varFromText, ProcArg, proc_arg
-   ,Proc_Int (..))
+import Graphics.Web.Processing.Core.Primal (varFromText,Proc_Int (..))
 import Control.Monad (liftM)
 -- generics
 import GHC.Generics
+import Graphics.Web.Processing.Core.TH
+
+{-
+
+This module is somehow magic. It allows you handle set of variables
+and arrays like if they were a single variable. It is very convenient
+to handle other values rather than the primitive Proc_* types.
+
+The interesting part is that you can make, with some restrictions,
+your own type be stored in one of these variables.
+
+-}
 
 -- | Variable with custom values.
 data CustomVar a = CustomVar [Text] deriving Generic
@@ -126,49 +141,12 @@ fromVar = CustomVar . (:[]) . varName
 fromCustomVar :: CustomVar a -> [Var a]
 fromCustomVar (CustomVar xs) = fmap varFromText xs
 
--- This instances are really boring (they are all equal).
--- Candidate for Template Haskell.
-
-instance CustomValue Proc_Bool where
- newVarC = liftM fromVar . newVar
- newArrayVarC = liftM fromArrayVar . newArrayVar
- readVarC = readVar . head . fromCustomVar
- writeVarC v x = writeVar (head $ fromCustomVar v) x
-
-instance CustomValue Proc_Int where
- newVarC = liftM fromVar . newVar
- newArrayVarC = liftM fromArrayVar . newArrayVar
- readVarC = readVar . head . fromCustomVar
- writeVarC v x = writeVar (head $ fromCustomVar v) x
-
-instance CustomValue Proc_Float where
- newVarC = liftM fromVar . newVar
- newArrayVarC = liftM fromArrayVar . newArrayVar
- readVarC = readVar . head . fromCustomVar
- writeVarC v x = writeVar (head $ fromCustomVar v) x
-
-instance CustomValue Proc_Text where
- newVarC = liftM fromVar . newVar
- newArrayVarC = liftM fromArrayVar . newArrayVar
- readVarC = readVar . head . fromCustomVar
- writeVarC v x = writeVar (head $ fromCustomVar v) x
-
-instance CustomValue Proc_Image where
- newVarC = liftM fromVar . newVar
- newArrayVarC = liftM fromArrayVar . newArrayVar
- readVarC = readVar . head . fromCustomVar
- writeVarC v x = writeVar (head $ fromCustomVar v) x
-
-instance CustomValue Proc_Char where
- newVarC = liftM fromVar . newVar
- newArrayVarC = liftM fromArrayVar . newArrayVar
- readVarC = readVar . head . fromCustomVar
- writeVarC v x = writeVar (head $ fromCustomVar v) x
-
 -- Custom arrays
 
+-- | Array variable of custom values.
 data CustomArrayVar a =
-  CustomArrayVar { customArraySize :: Int
+  CustomArrayVar { -- | Size of the custom array.
+                   customArraySize :: Int
                  , customInnerVar :: CustomVar a
                    }
 
@@ -184,58 +162,26 @@ class VarLength a where
  varLength :: a -> Int
  default varLength :: (Generic a, GVarLength (Rep a)) => a -> Int
  varLength = gvarLength . from
- -- | Get Proc_* type values inside a custom value.
- getValues :: a -> [ProcArg]
- default getValues :: (Generic a, GVarLength (Rep a)) => a -> [ProcArg]
- getValues = ggetValues . from
-
--- Repetitive instances. Subject to automatize
--- with Template Haskell.
-
-instance VarLength Proc_Bool where
- varLength _ = 1
- getValues = (:[]) . proc_arg
-instance VarLength Proc_Int where
- varLength _ = 1
- getValues = (:[]) . proc_arg
-instance VarLength Proc_Float where
- varLength _ = 1
- getValues = (:[]) . proc_arg
-instance VarLength Proc_Text where
- varLength _ = 1
- getValues = (:[]) . proc_arg
-instance VarLength Proc_Image where
- varLength _ = 1
- getValues = (:[]) . proc_arg
-instance VarLength Proc_Char where
- varLength _ = 1
- getValues = (:[]) . proc_arg
 
 -- GENERICS
 
 class GVarLength f where
  gvarLength :: f a -> Int
- ggetValues :: f a -> [ProcArg]
 
 instance GVarLength U1 where
  gvarLength _ = 1
- ggetValues _ = []
 
 instance (GVarLength a, GVarLength b) => GVarLength (a :*: b) where
  gvarLength (a :*: b) = gvarLength a  + gvarLength b
- ggetValues (a :*: b) = ggetValues a ++ ggetValues b
 
 instance GVarLength (a :+: b) where
  gvarLength _ = error "gvarLength: Custom variables cannot contain sum types."
- ggetValues _ = error "ggetValues: Custom variables cannot contain sum types."
 
 instance GVarLength a => GVarLength (M1 i c a) where
  gvarLength (M1 x) = gvarLength x
- ggetValues (M1 x) = ggetValues x
 
 instance VarLength a => GVarLength (K1 i a) where
  gvarLength (K1 x) = varLength x
- ggetValues (K1 x) = getValues x
 
 varDrop :: Int -> CustomVar a -> CustomVar a
 varDrop n (CustomVar xs) = CustomVar $ drop n xs
@@ -296,6 +242,29 @@ instance CustomValue a => GCustomValue (K1 i a) where
  gnewArrayVarC = liftM castCAVar . newArrayVarC . fmap unK1
  greadVarC v = liftM K1 $ readVarC $ castCVar v
  gwriteVarC v (K1 x) = writeVarC (castCVar v) x
+
+{- Proc_* types as custom values
+
+Any Proc_* type can be seen as a custom value,
+making a trivial instance to the CustomValue class,
+using custom variables as usual variables.
+
+For any Proc_* type:
+
+instance VarLength Proc_* where
+  varLength _ = 1
+
+instance CustomValue Proc_* where
+  newVarC = liftM fromVar . newVar
+  newArrayVarC = liftM fromArrayVar . newArrayVar
+  readVarC = readVar . head . fromCustomVar
+  writeVarC v x = writeVar (head $ fromCustomVar v) x
+
+-}
+
+$(deriveCustomValues)
+
+-- Instances for other types.
 
 instance (VarLength a, VarLength b) => VarLength (a,b)
 instance (CustomValue a, CustomValue b) => CustomValue (a,b)
