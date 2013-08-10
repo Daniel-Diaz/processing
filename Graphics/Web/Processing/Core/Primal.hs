@@ -798,7 +798,33 @@ Both ProcArg and ProcAssign are generated
 automatically, together with instances of the
 Pretty class, by procTypeMechs.
 Compile with "-f info" to see the generated
-code.
+code. The structure for each Proc_* type is as
+follows:
+
+data ProcArg = (union in *) *Arg Proc_*
+
+instance Pretty ProcArg where
+  (for each *) ppr (*Arg x) = ppr x
+
+data ProcAssign = (union in *) *Assign Text Proc_*
+
+instance Pretty ProcAssign where
+  (for each *) ppr (*Assign t x) =
+     fromText t <+> fromText "=" <+> ppr x
+
+data ProcList = (union in *) *List [Proc_*]
+
+instance Pretty ProcList where
+  (for each *) ppr (*List xs) =
+     fromText "{" <> commasep (fmap ppr xs) <> fromText "}"
+
+In addition, the following two functions are defined.
+
+ptype :: ProcAssign -> Doc
+(for each *) ptype (*Assign _ _) = fromText "Name of * in processing.js"
+
+ltype :: ProcList -> Doc
+(for each *) ltype (*List _) = fromText $ "Name of * in processing.js" ++ "[]"
 
 -}
 
@@ -952,7 +978,15 @@ Template Haskell is used in order to derive instances
 of the ProcType class. These instances consist merely
 in select the appropiate data constructor of the
 appropiate datatype. Use "-f info" when compiling
-with cabal to see the generated instances.
+with cabal to see the generated instances. This is
+the general format for each Proc_* type:
+
+instance ProcType Proc_* where
+  proc_assign = *Assign
+  proc_list = *List
+  proc_arg = *Arg
+  proc_read (Var v) = *_Var v
+  proc_cond = *_Cond
 
 -}
 
