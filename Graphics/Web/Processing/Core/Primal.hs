@@ -773,10 +773,10 @@ instance Pretty Proc_KeyCode where
 ----------------------------------------------
 ----------------------------------------------
 
-{- Proc_* types mechanics
+{- Proc_* type mechanics
 
-Two types are automatically generated for the
-Proc_* types. These are ProcArg and ProcAssign.
+Three types are automatically generated for the
+Proc_* types. These are ProcArg, ProcAssign and ProcList.
 A processing command may receive several arguments
 of the same or different Proc_* types.
 We encode arguments under the ProcArg type. The
@@ -794,7 +794,12 @@ of the different Proc_* types together with a value
 of type Text. This text represents the name of the
 variable in the assignment.
 
-Both ProcArg and ProcAssign are generated
+ProcList is a type for lists of processing values,
+used in the implementation of arrays. The ProcList
+type is the disjoint union of each Proc_* type
+embedded into a list.
+
+All ProcArg, ProcAssign and ProcList are generated
 automatically, together with instances of the
 Pretty class, by procTypeMechs.
 Compile with "-f info" to see the generated
