@@ -33,6 +33,19 @@ import Data.String (fromString)
 --   to generate the corresponding Processing code under the 'ProcCode' type.
 newtype ProcM c a = ProcM { unProcM :: StateT Int (Writer (ProcCode c)) a }
 
+{- ProcM monad definition
+
+On the inside, ProcM is a monad which stores both a counter and some
+processing code. The purpose of the counter is to give each variable
+an unique name. Using an inner writer monad, using 'tell', we append
+processing code. Each time we append the creation of a new var, we
+generate the name of that variable depending on the state of the
+counter. For example, if the counter is in 2, the variable will be
+named "v_2" (see 'intVarNumber'). The context of the ProcCode stored
+in the inner writer monad is propagated to the ProcM monad. 
+
+-}
+
 -- | Generate Processing code using the 'ProcM' monad.
 --   The code output is reduced.
 runProcM :: ProcM c a -> (a,ProcCode c)
@@ -62,7 +75,7 @@ instance Monad (ProcM c) where
  return = pure
  (ProcM w) >>= f = ProcM $ w >>= unProcM . f
 
--- | Adds @1@ to the variable counter and returns the result.
+-- | Add @1@ to the variable counter and returns the result.
 newVarNumber :: ProcM c Int
 newVarNumber = ProcM $ modify (+1) >> get
 
@@ -80,7 +93,7 @@ intVarName n = "v_" <> fromString (show n)
 -- Processing Monad class
 
 -- | Types in this instance form a monad when they are applied
---   to a context @c@. Then, they are used to write Processing
+--   to a context @c@. They are used to write Processing
 --   code.
 class ProcMonad m where
  -- | Internal function to process commands in the target monad.
@@ -123,18 +136,27 @@ class ProcMonad m where
 --
 --   will draw a point at (10,20).
 instance ProcMonad ProcM where
+ -- commandM, assignM, createVarM, createArrayVarM and writeComment
+ -- send, using 'tell', to the inner writer monad.
  commandM n as = ProcM $ lift $ tell $ Command n as
  assignM = ProcM . lift . tell . Assignment
  createVarM = ProcM . lift . tell . CreateVar
  createArrayVarM n xs = ProcM $ lift $ tell $ CreateArrayVar n xs
  writeComment = ProcM . lift . tell . Comment
+ -- Conditionals are a bit trickier. We need to make sure that
+ -- the variable number traverses the conditional and keeps any
+ -- modifications performed inside the conditional.
  iff b (ProcM e1) (ProcM e2) = ProcM $ do
    i0 <- get
    let (i1,c1) = runWriter $ execStateT e1 i0
        (i2,c2) = runWriter $ execStateT e2 i1
    put i2
    lift $ tell $ Conditional b c1 c2
+ -- The method liftProc is useful for other mondas, like EventM
+ -- or ScriptM that are built in top of ProcM.
  liftProc = id
+ -- Create a new variable, automatically asigning a name depending
+ -- on the current variable number.
  newVar x = do
    n <- newVarNumber
    let v = intVarName n
