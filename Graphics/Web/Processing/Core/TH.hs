@@ -126,6 +126,17 @@ procTypeInst n = InstanceD [] (AppT (ConT $ mkName "ProcType") $ ConT $ mkName $
                                                 (VarE $ mkName "v") )
                                [] ]
   , FunD (mkName "proc_cond" ) [ Clause [] (NormalB $ ConE $ mkName $ n ++ "_Cond") [] ]
+  , FunD (mkName "mapArg") [ Clause [VarP $ mkName "f", ConP (mkName $ n ++ "Arg") [VarP $ mkName "x"]]
+                                    (NormalB $ ConE (mkName $ n ++ "Arg") `AppE` (VarE (mkName "f")
+                                                                          `AppE` (VarE $ mkName "x")))
+                                    []
+                           , Clause [WildP,VarP $ mkName "a"] (NormalB $ VarE $ mkName "a") [] ]
+  , FunD (mkName "mapAssign") [ Clause [VarP $ mkName "f", ConP (mkName $ n ++ "Assign") [VarP $ mkName "t",VarP $ mkName "x"]]
+                                    (NormalB $ ConE (mkName $ n ++ "Assign") `AppE` (VarE $ mkName "t")
+                                                                             `AppE` (VarE (mkName "f")
+                                                                             `AppE` (VarE $ mkName "x")))
+                                    []
+                           , Clause [WildP,VarP $ mkName "a"] (NormalB $ VarE $ mkName "a") [] ]
     ]
 
 -- | Pretty instance of ProcArg.
@@ -198,5 +209,8 @@ customValueInst t = instanceD (return []) [t|$(conT $ mkName "CustomValue") $(co
   , funD (mkName "writeVarC")
       [ do b <- fmap NormalB $ [|$(dyn "writeVar") (head $ $(dyn "fromCustomVar") $(dyn "v")) $(dyn "x")|]
            return $ Clause [VarP (mkName "v"),VarP (mkName "x")] b []
+      ]
+  , funD (mkName "ifC")
+      [ return $ Clause [] (NormalB $ VarE $ mkName "if_") []
       ]
     ]

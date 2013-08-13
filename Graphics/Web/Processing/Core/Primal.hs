@@ -882,7 +882,8 @@ instance Pretty (ProcCode c) where
        c2 = indent indentLevel $ ppr e2
    in  pfunction "if" [ppr b]
    <+> enclose lbrace rbrace (line <> c1)
-   <+> fromText "else" <+> enclose lbrace rbrace (line <> c2)
+   <+> if e2 == mempty then mempty
+                       else fromText "else" <+> enclose lbrace rbrace (line <> c2)
  ppr (Comment t) = stack $ fmap (fromText . ("// " <>)) $ Data.Text.lines t
  ppr (Sequence sq) =
    if Seq.null sq then Text.PrettyPrint.Mainland.empty
@@ -976,6 +977,10 @@ class ProcType a where
  proc_read :: Var a -> a
  -- | Conditional value.
  proc_cond :: Proc_Bool -> a -> a -> a
+ -- | Map an argument.
+ mapArg :: (a -> a) -> ProcArg -> ProcArg
+ -- | Map an assignment.
+ mapAssign :: (a -> a) -> ProcAssign -> ProcAssign
 
 {- Template Haskell and Proc_* types.
 
@@ -992,6 +997,8 @@ instance ProcType Proc_* where
   proc_arg = *Arg
   proc_read (Var v) = *_Var v
   proc_cond = *_Cond
+  mapArg (*Arg x) = *Arg (f x)
+  mapAssign (*Assign t x) = *Assign t (f x)
 
 -}
 
@@ -1117,16 +1124,28 @@ operations.
 -}
 
 instance Reducible Proc_Float where
+ reduce (Float_Sum 0 y) = reduce y
+ reduce (Float_Sum x 0) = reduce x
+ -- Distribution
+ reduce f@(Float_Sum (Float_Mult x y) (Float_Mult x' y'))
+   | x == x' = reduce $ x * (y + y')
+   | y == y' = reduce $ y * (x + x')
+   | otherwise = recursor reduce f
+ --
  reduce (Float_Sum x y) =
    if x == y
       -- x+x = 2*x
       then 2 * reduce x
       else reduce x + reduce y
+ reduce (Float_Substract 0 y) = reduce $ negate y
+ reduce (Float_Substract x 0) = reduce x
  reduce (Float_Substract x y) =
    if x == y
       -- x-x = 0
       then 0
       else reduce x - reduce y
+ reduce (Float_Mult 1 y) = reduce y
+ reduce (Float_Mult x 1) = reduce x
  reduce (Float_Mult x y) =
    if x == y
       -- x*x = x^2

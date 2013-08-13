@@ -108,6 +108,10 @@ class VarLength a => CustomValue a where
  writeVarC :: (Monad (m c), ProcMonad m) => CustomVar a -> a -> m c ()
  default writeVarC :: (Monad (m c), ProcMonad m, Generic a, GCustomValue (Rep a)) => CustomVar a -> a -> m c ()
  writeVarC v x = gwriteVarC (castCVar v) (from x)
+ -- | Version of 'if_' for custom values.
+ ifC :: Proc_Bool -> a -> a -> a
+ default ifC :: (Generic a, GCustomValue (Rep a)) => Proc_Bool -> a -> a -> a
+ ifC b x y = to $ gifC b (from x) (from y)
 
 -- Maybe this function can be written in terms of arrayVarToVar?
 arrayVarToVarC :: CustomArrayVar a -> Proc_Int -> CustomVar a
@@ -197,6 +201,7 @@ class GCustomValue f where
  gnewArrayVarC :: (Monad (m Preamble), ProcMonad m) => [f a] -> m Preamble (CustomArrayVar (f a))
  greadVarC :: (Monad (m c), ProcMonad m) => CustomVar (f a) -> m c (f a)
  gwriteVarC :: (Monad (m c), ProcMonad m) => CustomVar (f a) -> f a -> m c ()
+ gifC :: Proc_Bool -> f a -> f a -> f a
 
 leftP :: (a :*: b) c -> a c
 leftP (a :*: _) = a
@@ -224,24 +229,28 @@ instance (GVarLength a, GCustomValue a, GCustomValue b) => GCustomValue (a :*: b
    let (xs,ys) = splitAt (gvarLength a) v
    gwriteVarC (CustomVar xs) a
    gwriteVarC (CustomVar ys) b
+ gifC c (a :*: b) (x :*: y) = gifC c a x :*: gifC c b y
 
 instance GCustomValue (a :+: b) where
  gnewVarC      = error      "gnewVarC: Custom variables cannot contain sum types."
  gnewArrayVarC = error "gnewArrayVarC: Custom variables cannot contain sum types."
  greadVarC     = error     "greadVarC: Custom variables cannot contain sum types."
  gwriteVarC    = error    "gwriteVarC: Custom variables cannot contain sum types."
+ gifC          = error          "gifC: Custom values are not sum types."
 
 instance GCustomValue a => GCustomValue (M1 i c a) where
  gnewVarC (M1 x) = liftM castCVar $ gnewVarC x
  gnewArrayVarC = liftM castCAVar . gnewArrayVarC . fmap unM1
  greadVarC v = liftM M1 $ greadVarC $ castCVar v
  gwriteVarC v (M1 x) = gwriteVarC (castCVar v) x
+ gifC b (M1 x) (M1 y) = M1 $ gifC b x y
 
 instance CustomValue a => GCustomValue (K1 i a) where
  gnewVarC (K1 x) = liftM castCVar $ newVarC x
  gnewArrayVarC = liftM castCAVar . newArrayVarC . fmap unK1
  greadVarC v = liftM K1 $ readVarC $ castCVar v
  gwriteVarC v (K1 x) = writeVarC (castCVar v) x
+ gifC b (K1 x) (K1 y) = K1 $ ifC b x y
 
 {- Proc_* types as custom values
 
@@ -259,6 +268,7 @@ instance CustomValue Proc_* where
   newArrayVarC = liftM fromArrayVar . newArrayVar
   readVarC = readVar . head . fromCustomVar
   writeVarC v x = writeVar (head $ fromCustomVar v) x
+  ifC = if_
 
 -}
 
