@@ -27,7 +27,10 @@ import Control.Arrow (second)
 class (Ord e, Recursive e, ProcType e) => Optimizable e where
  numOps :: e -> Int
  browseExp :: e -> ExpCounter e ()
- expsInCode :: ProcCode c -> Seq e
+ getFromArg :: ProcArg -> Maybe e
+ getFromAssign :: ProcAssign -> Maybe e
+
+-- BOOL INSTANCE
 
 instance Optimizable Proc_Bool where
  numOps (Proc_Neg x) = 1 + numOps x
@@ -40,9 +43,45 @@ instance Optimizable Proc_Bool where
  numOps (Float_GE x y) = 1 + numOps x + numOps y
  numOps (Float_G x y) = 1 + numOps x + numOps y
  numOps _ = 0
+ getFromArg (BoolArg x) = Just x
+ getFromArg _ = Nothing
+ getFromAssign (BoolAssign _ x) = Just x
+ getFromAssign _ = Nothing
  -- TODO
+ browseExp b@(Proc_Neg x) = addExp b >> browseExp b
+ browseExp b@(Proc_Or x y) = addExp b >> browseExp x >> browseExp y
+ browseExp b@(Proc_And x y) = addExp b >> browseExp x >> browseExp y
+ browseExp b = addExp b
+
+-- INT INSTANCE
+
+instance Optimizable Proc_Int where
+ numOps (Int_Sum x y) = 1 + numOps x + numOps y
+ numOps (Int_Substract x y) = 1 + numOps x + numOps y
+ numOps (Int_Divide x y) = 1 + numOps x + numOps y
+ numOps (Int_Mult x y) = 1 + numOps x + numOps y
+ numOps (Int_Mod x y) = 1 + numOps x + numOps y
+ numOps (Int_Abs x) = 1 + numOps x
+ numOps (Int_Floor x) = 1 + numOps x
+ numOps (Int_Round x) = 1 + numOps x
+ numOps (Int_Cond b x y) = numOps b + max (numOps x) (numOps y)
+ numOps _ = 0
+ browseExp i@(Int_Sum x y) = addExp i >> browseExp x >> browseExp y
+ browseExp i@(Int_Substract x y) = addExp i >> browseExp x >> browseExp y
+ browseExp i@(Int_Divide x y) = addExp i >> browseExp x >> browseExp y
+ browseExp i@(Int_Mult x y) = addExp i >> browseExp x >> browseExp y
+ browseExp i@(Int_Mod x y) = addExp i >> browseExp x >> browseExp y
+ browseExp i@(Int_Abs x) = addExp i
+ browseExp i@(Int_Floor x) = addExp i
+ browseExp i@(Int_Round x) = addExp i
+ browseExp i@(Int_Cond b x y) = addExp i >> browseExp x >> browseExp y
  browseExp _ = return ()
- expsInCode _ = mempty
+ getFromArg (IntArg x) = Just x
+ getFromArg _ = Nothing
+ getFromAssign (IntAssign _ x) = Just x
+ getFromAssign _ = Nothing
+
+-- FLOAT INSTANCE
 
 instance Optimizable Proc_Float where
  numOps (Proc_Float _) = 0
@@ -89,12 +128,12 @@ instance Optimizable Proc_Float where
  browseExp f@(Float_Noise x y) = addExp f >> browseExp x >> browseExp y
  browseExp f@(Float_Cond _ x y) = addExp f >> browseExp x >> browseExp y
  browseExp _ = return ()
- -- Gather expressions in code.
- expsInCode (Command _ xs) = getFloatArgs xs
- expsInCode (Conditional _ c1 c2) = expsInCode c1 <> expsInCode c2
- expsInCode (Sequence xs) = F.foldMap expsInCode xs
- expsInCode (Assignment (FloatAssign _ x)) = Seq.singleton x
- expsInCode _ = mempty
+ --
+ getFromArg (FloatArg x) = Just x
+ getFromArg _ = Nothing
+ getFromAssign (FloatAssign _ x) = Just x
+ getFromAssign _ = Nothing
+
 
 -----------------------------------------------------
 -----------------------------------------------------
@@ -117,6 +156,22 @@ occurNumber = 2
 --   depending on 'limitNumber'.
 isExpensive :: Optimizable e => e -> Bool
 isExpensive = (> limitNumber) . numOps
+
+getExpArgs :: Optimizable e => [ProcArg] -> Seq e
+getExpArgs = F.foldr (
+  \x xs -> case getFromArg x of
+    Just a -> a Seq.<| xs
+    _ -> xs) mempty
+
+expsInCode :: Optimizable e => ProcCode c -> Seq e
+expsInCode (Command _ xs) = getExpArgs xs
+expsInCode (Conditional _ c1 c2) = expsInCode c1 <> expsInCode c2
+expsInCode (Sequence xs) = F.foldMap expsInCode xs
+expsInCode (Assignment a) =
+ case getFromAssign a of
+  Just x  -> Seq.singleton x
+  _ -> mempty
+expsInCode _ = mempty
 
 type ExpCounter e = State (MultiSet e)
 
@@ -152,15 +207,6 @@ expsubs :: (Eq e, Recursive e)
           -> e -- ^ Expression.
           -> e -- ^ Result.
 expsubs o t x = if x == o then t else recursor (expsubs o t) x
-
--- | From a list of arguments, create a sequence of the
---   arguments of type 'Proc_Float' (which may be empty).
-getFloatArgs :: [ProcArg] -> Seq Proc_Float
-getFloatArgs = F.foldr (
-  \x xs -> case x of
-    FloatArg a -> a Seq.<| xs
-    _ -> xs) mempty
-
 
 -- | Like 'mostFreq', but applied to a piece of code.
 mostFreqCode :: Optimizable e => e -> ProcCode c -> Maybe e
@@ -240,9 +286,11 @@ applySubstitution :: SubsM c ()
 applySubstitution = do
   stack <- codeStack <$> get
   n <- substitutionIndex <$> get
-  let (c,m) = substitutionOver (Proc_Float 0) n stack
-  addToWritten c
-  setIndex m
+  let (c1,n1) = substitutionOver (undefined :: Proc_Float) n stack
+      (c2,n2) = substitutionOver (undefined :: Proc_Int) n1 c1
+      (c3,n3) = substitutionOver (undefined :: Proc_Bool) n2 c2
+  addToWritten c3
+  setIndex n3
   resetStack
 
 codeSubstitution :: ProcCode c -> SubsM c ()
@@ -287,8 +335,8 @@ optimizeBySubstitution
         (n3,_mouseClicked')  = maybe (n2,Nothing) (second Just . subsOptimize n2) _mouseClicked
         (n4,_mouseReleased') = maybe (n3,Nothing) (second Just . subsOptimize n3) _mouseReleased
         (n5,_keyPressed')    = maybe (n4,Nothing) (second Just . subsOptimize n4) _keyPressed
-        vs = fmap (\n -> CreateVar $ FloatAssign (optVarName n) 0) [1 .. n5 - 1]
-    in ProcScript (_preamble <> subsComment (mconcat vs))
+        -- vs = fmap (\n -> CreateVar $ FloatAssign (optVarName n) 0) [1 .. n5 - 1]
+    in ProcScript (_preamble {-<> subsComment (mconcat vs)-})
                    _setup'
                    _draw'
                    _mouseClicked'
