@@ -1124,33 +1124,33 @@ operations.
 -}
 
 instance Reducible Proc_Float where
- reduce (Float_Sum 0 y) = reduce y
- reduce (Float_Sum x 0) = reduce x
  -- Distribution
  reduce f@(Float_Sum (Float_Mult x y) (Float_Mult x' y'))
    | x == x' = reduce $ x * (y + y')
    | y == y' = reduce $ y * (x + x')
    | otherwise = recursor reduce f
+ -- x + (-y) = x - y
+ reduce (Float_Sum x (Float_Neg y)) = reduce $ Float_Substract x y
+ -- (-x) + y = y - x
+ reduce (Float_Sum (Float_Neg x) y) = reduce $ Float_Substract y x
  --
- reduce (Float_Sum x y) =
-   if x == y
-      -- x+x = 2*x
-      then 2 * reduce x
-      else reduce x + reduce y
- reduce (Float_Substract 0 y) = reduce $ negate y
- reduce (Float_Substract x 0) = reduce x
- reduce (Float_Substract x y) =
-   if x == y
-      -- x-x = 0
-      then 0
-      else reduce x - reduce y
- reduce (Float_Mult 1 y) = reduce y
- reduce (Float_Mult x 1) = reduce x
- reduce (Float_Mult x y) =
-   if x == y
-      -- x*x = x^2
-      then reduce x ** 2
-      else reduce x * reduce y
+ reduce (Float_Sum x y)
+   | x == y = 2 * reduce x
+   | x == 0 = reduce y
+   | y == 0 = reduce x
+   | otherwise = reduce x + reduce y
+ -- x - (-y) = x + y
+ reduce (Float_Substract x (Float_Neg y)) = reduce $ Float_Sum x y
+ reduce (Float_Substract x y)
+   | x == y = 0
+   | x == 0 = reduce $ negate y
+   | y == 0 = reduce x
+   | otherwise = reduce x - reduce y
+ reduce (Float_Mult x y)
+   | x == y = reduce x ** 2
+   | x == 1 = reduce y
+   | y == 1 = reduce x
+   | otherwise = reduce x * reduce y
  -- (x*y)/z = y*(x/z)
  reduce (Float_Divide (Float_Mult (Proc_Float x) y) (Proc_Float z)) =
    reduce $ (y*) $ Proc_Float $ x / z

@@ -7,10 +7,13 @@ module Graphics.Web.Processing.Core.TH (
   , procTypeMechs
   , deriveProcTypeInsts
   , deriveCustomValues
+  , deriveOptimizable
   ) where
 
 import Language.Haskell.TH
 import Control.Monad
+import Data.Maybe (catMaybes)
+import Data.List (isSuffixOf)
 
 {- RECURSOR -}
 
@@ -214,3 +217,159 @@ customValueInst t = instanceD (return []) [t|$(conT $ mkName "CustomValue") $(co
       [ return $ Clause [] (NormalB $ VarE $ mkName "if_") []
       ]
     ]
+
+-- OPTIMIZATION CLASS
+
+optimizableTypes :: [String]
+optimizableTypes = [ "Bool", "Int", "Float" ]
+
+deriveOptimizable :: Q [Dec]
+deriveOptimizable = mapM optimizableInst optimizableTypes
+
+optimizableInst :: String -> Q Dec
+optimizableInst tn = do
+  let t  = mkName $ "Proc_" ++ tn
+      ts = [ mkName $ "Proc_" ++ str
+           | str <- optimizableTypes , str /= tn ]
+  -- browse*
+  TyConI (DataD _ _ _ cs _) <- reify t
+  selfds  <- sequence [ browseSelf n $ fmap snd as
+                      | NormalC n as <- cs ]
+  let browseSelfD = FunD (mkName $ "browse" ++ tn) selfds
+  browseOthersD <-
+      mapM (\ot -> do TyConI (DataD _ _ _ ocs _) <- reify ot
+                      otherds <- sequence [ browseOther n $ fmap snd as
+                                          | NormalC n as <- ocs ]
+                      return $ FunD (mkName $ "browse" ++ (drop 5 $ nameBase ot)) otherds
+            ) ts
+  -- numOps
+  numOpsClauses <- sequence [ numOpsC n $ fmap snd as
+                            | NormalC n as <- tail cs
+                            , not $ null as
+                            , let str = nameBase n
+                            , not $ "Random" `isSuffixOf` str
+                            , not $ "Var" `isSuffixOf` str
+                              ]
+  let numOpsD = FunD (mkName "numOps") $ numOpsClauses
+                                      ++ [Clause [WildP] (NormalB $ LitE $ IntegerL 0) []]
+  -- ReplaceIn*
+  let idClause = Clause [WildP,WildP,VarP $ mkName "e"] (NormalB $ VarE $ mkName "e") []
+  replaceInSelfCs <- sequence [ replaceInSelfC n $ fmap snd as
+                              | NormalC n as <- tail cs
+                              , not $ null as
+                              , let str = nameBase n
+                              , not $ "Random" `isSuffixOf` str
+                              , not $ "Var" `isSuffixOf` str
+                                ]
+  let replaceInSelf = FunD (mkName $ "replaceIn" ++ tn) $ replaceInSelfCs ++ [idClause]
+  replaceInOthers <-
+      mapM (\ot -> do TyConI (DataD _ _ _ ocs _) <- reify ot
+                      othersd <- sequence [ replaceInOtherC n $ fmap snd as
+                                          | NormalC n as <- tail ocs
+                                          , not $ null as
+                                          , let str = nameBase n
+                                          , not $ "Random" `isSuffixOf` str
+                                          , not $ "Var" `isSuffixOf` str
+                                            ]
+                      return $ FunD (mkName $ "replaceIn" ++ (drop 5 $ nameBase ot)) $ othersd ++ [idClause]
+            ) ts
+  -- Return
+  return $ InstanceD [] (ConT (mkName "Optimizable") `AppT` ConT t) $
+      (numOpsD : browseSelfD : browseOthersD) ++
+      (replaceInSelf : replaceInOthers)
+
+replaceInOtherC :: Name -> [Type] -> Q Clause
+replaceInOtherC c ts = do
+  vs <- mapM (\t -> fmap (\v -> (v,t)) $ newName "x") ts
+  let patf (v,_) = VarP v
+      bodyf (v,ConT t) = let str = nameBase t
+                         in  if str `elem` fmap ("Proc_"++) optimizableTypes
+                                then VarE (mkName $ "replaceIn" ++ drop 5 str)
+                                       `AppE` VarE (mkName "o") 
+                                       `AppE` VarE (mkName "t")
+                                       `AppE` VarE v
+                                else VarE v
+      bodyf _ = error "TH.ReplaceInOther: Bad constructor. Report this as a bug."
+      e2 = foldl1 AppE $ ConE c : fmap bodyf vs
+      optts = filter (\(ConT t) -> nameBase t `elem` fmap ("Proc_"++) optimizableTypes) ts
+      cleanf x = if null optts then WildP else x
+  return $ Clause [ cleanf $ VarP $ mkName "o" -- Origin variable
+                  , cleanf $ VarP $ mkName "t" -- Target variable
+                  , ConP c $ fmap patf vs]
+                  (NormalB e2)
+                  []
+
+replaceInSelfC :: Name -> [Type] -> Q Clause
+replaceInSelfC c ts = do
+  vs <- mapM (\t -> fmap (\v -> (v,t)) $ newName "x") ts
+  let patf (v,_) = VarP v
+  b <- [|$(dyn "o") == $(dyn "e")|]
+  let e1 = VarE $ mkName "t"
+      bodyf (v,ConT t) = let str = nameBase t
+                         in  if str `elem` fmap ("Proc_"++) optimizableTypes
+                                then VarE (mkName $ "replaceIn" ++ drop 5 str)
+                                       `AppE` VarE (mkName "o") 
+                                       `AppE` VarE (mkName "t")
+                                       `AppE` VarE v
+                                else VarE v
+      bodyf _ = error "TH.ReplaceInSelf: Bad constructor. Report this as a bug."
+      e2 = foldl1 AppE $ ConE c : fmap bodyf vs
+  return $ Clause [ VarP $ mkName "o" -- Origin variable
+                  , VarP $ mkName "t" -- Target variable
+                  , AsP (mkName "e") $ ConP c $ fmap patf vs]
+                  (NormalB $ CondE b e1 e2)
+                  []
+
+(>>>) :: Exp -> Exp -> Exp
+e1 >>> e2 = InfixE (Just e1) (VarE $ mkName ">>") (Just e2)
+
+returnu :: Exp
+returnu = VarE (mkName "return") `AppE` TupE []
+
+optimizableVars :: [Type] -- Types
+                -> Q [Maybe (Name,String)] -- List of pairs (newVar,Proc_* optimizable type without Proc_)
+optimizableVars ts = sequence [ if n `elem` fmap ("Proc_"++) optimizableTypes
+                                   then do v <- newName "x"
+                                           return $ Just (v,drop 5 n)
+                                   else return Nothing
+                              | ConT t <- ts
+                              , let n = nameBase t
+                                ]
+
+browseOther :: Name   -- Constructor name
+            -> [Type] -- Types of the constructor arguments
+            -> Q Clause -- Clause of the browse* definition for
+                        -- the given constructor
+browseOther c ts = do
+   vs <- optimizableVars ts
+   let patf Nothing  = WildP
+       patf (Just (v,_)) = VarP v
+       bodyf (v,t) = VarE (mkName $ "browse" ++ t) `AppE` VarE v
+   return $ Clause [ConP c $ fmap patf vs]
+                   (NormalB $ foldr (>>>) returnu $ fmap bodyf $ catMaybes vs)
+                   []
+
+browseSelf :: Name -> [Type] -> Q Clause
+browseSelf c ts = do
+ Clause p (NormalB b) d <- browseOther c ts
+ return $ Clause (fmap (AsP $ mkName "e") p)
+                 (NormalB $ AppE (VarE $ mkName "addExp")
+                                 (VarE $ mkName "e") >>> b) d
+
+(+.) :: Exp -> Exp -> Exp
+e1 +. e2 = InfixE (Just e1) (VarE $ mkName "+") (Just e2)
+
+oneE :: Exp
+oneE = LitE $ IntegerL 1
+
+numOpsC :: Name -- Constructor name
+        -> [Type] -- Types of the constructor arguments (non-empty list)
+        -> Q Clause
+numOpsC c ts = do
+  vs <- optimizableVars ts
+  let patf Nothing = WildP
+      patf (Just (v,_)) = VarP v
+      bodyf (v,_) = VarE (mkName "numOps") `AppE` VarE v
+  return $ Clause [ConP c $ fmap patf vs]
+                  (NormalB $ foldl (+.) oneE $ fmap bodyf $ catMaybes vs)
+                  []
