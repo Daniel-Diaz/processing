@@ -195,11 +195,11 @@ applySubstitution :: SubsM c ()
 applySubstitution = do
   stack <- codeStack <$> get
   n <- substitutionIndex <$> get
-  let (s1,c1,n1) = substitutionOver (undefined :: Proc_Bool) n stack
+  let (s1,c1,n1) = substitutionOver (undefined :: Proc_Float) n stack
   addToWritten s1
   let (s2,c2,n2) = substitutionOver (undefined :: Proc_Int) n1 c1
   addToWritten s2
-  let (s3,c3,n3) = substitutionOver (undefined :: Proc_Float) n2 c2
+  let (s3,c3,n3) = substitutionOver (undefined :: Proc_Bool) n2 c2
   addToWritten s3
   addToWritten c3
   setIndex n3
