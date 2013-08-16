@@ -287,6 +287,7 @@ pacmanScript rows cols dots map = execScriptM $ do
      mapM_ (\(i,j) -> do t <- getTile i j
                          when (t #== 2) $ drawAt i j drawEnergizer) tenergizers -- Energizers
      -- Draw helper
+     fill $ Color 255 255 255 255
      drawAt (-1) 0 $ \p -> drawtext (fromStText $ "Use Arrow keys to move. Yellow dots will make "
                                   <> "ghosts not follow you for a few seconds.") p 500 200
      -- Remove ghost walls after the first scatter time
