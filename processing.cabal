@@ -61,6 +61,7 @@ Extra-source-files:
   examples/mill.hs
   examples/keys.hs
   examples/random.hs
+  examples/pacman.hs
 
 Source-repository head
   type: git
