@@ -41,6 +41,8 @@ module Graphics.Web.Processing.Core.Primal (
   , Proc_KeyCode (..)
   -- ** Type class of proc types
   , ProcType (..)
+  , isVarInArg, isVarInAssign
+  , assignVarName
   -- ** Conditionals
   , Proc_Eq (..)
   , Proc_Ord (..)
@@ -977,10 +979,8 @@ class ProcType a where
  proc_read :: Var a -> a
  -- | Conditional value.
  proc_cond :: Proc_Bool -> a -> a -> a
- -- | Map an argument.
- mapArg :: (a -> a) -> ProcArg -> ProcArg
- -- | Map an assignment.
- mapAssign :: (a -> a) -> ProcAssign -> ProcAssign
+ -- | Check if a variable is contained in an expression.
+ checkForVar :: Text -> a -> Bool
 
 {- Template Haskell and Proc_* types.
 
@@ -997,8 +997,6 @@ instance ProcType Proc_* where
   proc_arg = *Arg
   proc_read (Var v) = *_Var v
   proc_cond = *_Cond
-  mapArg (*Arg x) = *Arg (f x)
-  mapAssign (*Assign t x) = *Assign t (f x)
 
 -}
 

@@ -91,7 +91,7 @@ replaceInCode _ _ c = c
 -- | Maximum number of operations allowed for a
 --   'Proc_Float' calculation to be considered cheap.
 limitNumber :: Int
-limitNumber = 0
+limitNumber = 1
 
 -- | Number of times an expression is considered
 --   repeated enough to be substituted.
@@ -175,7 +175,8 @@ subsPostComment = Comment " "
 
 data SubsState c = SubsState { codeWritten :: ProcCode c
                              , codeStack :: ProcCode c
-                             , substitutionIndex :: Int }
+                             , substitutionIndex :: Int
+                             , mutatedVariables :: [Text] }
 
 type SubsM c = State (SubsState c)
 
@@ -191,6 +192,29 @@ setIndex n = modify $ \s -> s { substitutionIndex = n }
 resetStack :: SubsM c ()
 resetStack = modify $ \s -> s { codeStack = mempty }
 
+mutateVariable :: Text -> SubsM c ()
+mutateVariable t = modify $ \s -> s { mutatedVariables = t : mutatedVariables s }
+
+cleanVariables :: SubsM c ()
+cleanVariables = modify $ \s -> s { mutatedVariables = [] }
+
+isVarInCode :: Text -> ProcCode c -> Bool
+isVarInCode t (Command _ as) = foldr (\a r -> isVarInArg t a || r) False as
+isVarInCode t (Assignment a) = isVarInAssign t a
+isVarInCode t (Conditional b c1 c2) = checkForVar t b || isVarInCode t c1 || isVarInCode t c2
+isVarInCode t (Sequence xs) = F.foldr (\c r -> isVarInCode t c || r) False xs
+isVarInCode _ _ = False
+
+{- Apply substitution
+
+Get the current stack, apply the optimization to it,
+append the result as written code and reset the stack.
+
+The order in which the substitutions for the different
+types are made matters. The most frequent type should
+be first.
+
+-}
 applySubstitution :: SubsM c ()
 applySubstitution = do
   stack <- codeStack <$> get
@@ -205,8 +229,16 @@ applySubstitution = do
   setIndex n3
   resetStack
 
+addWithMutations :: ProcCode c -> SubsM c ()
+addWithMutations c = do
+  vs <- mutatedVariables <$> get
+  let b = any (\v -> isVarInCode v c) vs
+  if b then applySubstitution >> cleanVariables >> addToStack c
+       else addToStack c
+
 codeSubstitution :: ProcCode c -> SubsM c ()
-codeSubstitution a@(Assignment _) = addToStack a >> applySubstitution
+codeSubstitution c@(Command _ _) = addWithMutations c
+codeSubstitution c@(Assignment a) = addWithMutations c >> mutateVariable (assignVarName a)
 codeSubstitution (Conditional b c1 c2) = do
   applySubstitution
   n0 <- substitutionIndex <$> get
@@ -215,12 +247,12 @@ codeSubstitution (Conditional b c1 c2) = do
   setIndex n2
   addToWritten $ Conditional b c1' c2'
 codeSubstitution (Sequence xs) = F.mapM_ codeSubstitution xs
-codeSubstitution x = addToStack x
+codeSubstitution c = addToStack c
 
 runSubstitution :: Int -> SubsM c a -> (Int,ProcCode c)
 runSubstitution n m = (substitutionIndex s, codeWritten s)
   where
-    (_,s) = runState m $ SubsState mempty mempty n
+    (_,s) = runState m $ SubsState mempty mempty n []
 
 subsOptimize :: Int -> ProcCode c -> (Int,ProcCode c)
 subsOptimize n c = runSubstitution n $ codeSubstitution c >> applySubstitution

@@ -118,9 +118,10 @@ procListPrettyInst procList =
       inst = FunD (mkName "ppr") defs
   in  InstanceD [] (AppT (ConT $ mkName "Pretty") (ConT $ mkName "ProcList")) [inst]
 
--- | Create 'ProcType' instance for a @Proc_*@ type.
-procTypeInst :: String -> Dec
-procTypeInst n = InstanceD [] (AppT (ConT $ mkName "ProcType") $ ConT $ mkName $ "Proc_" ++ n)
+-- | Create 'ProcType' instance for a @Proc_*@ type,
+--   given the function declaration of checkForArg.
+procTypeInst :: String -> Dec -> Dec
+procTypeInst n cfa = InstanceD [] (AppT (ConT $ mkName "ProcType") $ ConT $ mkName $ "Proc_" ++ n)
   [ FunD (mkName "proc_assign") [ Clause [] (NormalB $ ConE $ mkName $ n ++ "Assign") [] ]
   , FunD (mkName "proc_list") [ Clause [] (NormalB $ ConE $ mkName $ n ++ "List") [] ]
   , FunD (mkName "proc_arg"  ) [ Clause [] (NormalB $ ConE $ mkName $ n ++ "Arg"  ) [] ]
@@ -129,18 +130,35 @@ procTypeInst n = InstanceD [] (AppT (ConT $ mkName "ProcType") $ ConT $ mkName $
                                                 (VarE $ mkName "v") )
                                [] ]
   , FunD (mkName "proc_cond" ) [ Clause [] (NormalB $ ConE $ mkName $ n ++ "_Cond") [] ]
-  , FunD (mkName "mapArg") [ Clause [VarP $ mkName "f", ConP (mkName $ n ++ "Arg") [VarP $ mkName "x"]]
-                                    (NormalB $ ConE (mkName $ n ++ "Arg") `AppE` (VarE (mkName "f")
-                                                                          `AppE` (VarE $ mkName "x")))
-                                    []
-                           , Clause [WildP,VarP $ mkName "a"] (NormalB $ VarE $ mkName "a") [] ]
-  , FunD (mkName "mapAssign") [ Clause [VarP $ mkName "f", ConP (mkName $ n ++ "Assign") [VarP $ mkName "t",VarP $ mkName "x"]]
-                                    (NormalB $ ConE (mkName $ n ++ "Assign") `AppE` (VarE $ mkName "t")
-                                                                             `AppE` (VarE (mkName "f")
-                                                                             `AppE` (VarE $ mkName "x")))
-                                    []
-                           , Clause [WildP,VarP $ mkName "a"] (NormalB $ VarE $ mkName "a") [] ]
+  , cfa
     ]
+
+(||*) :: Exp -> Exp -> Exp
+e1 ||* e2 = InfixE (Just e1) (VarE $ mkName "||") (Just e2)
+
+checkForVar :: String -> Q Dec
+checkForVar t = do
+ TyConI (DataD _ _ _ cs _) <- reify $ mkName $ "Proc_" ++ t
+ ds <- sequence 
+   [ do vs <- mapM (\(ConT a) -> if elem (nameBase a) $ fmap ("Proc_"++) procTypeNames
+                                    then fmap Just $ newName "x"
+                                    else return Nothing) $ fmap snd as
+        let patf Nothing  = WildP
+            patf (Just v) = VarP v
+            bodyf v = VarE (mkName "checkForVar") `AppE` VarE (mkName "t") `AppE` VarE v
+            vs' = catMaybes vs
+        return $ Clause [if null vs' then WildP else VarP $ mkName "t" , ConP n $ fmap patf vs]
+                        (NormalB $ foldr (\x y -> bodyf x ||* y) (ConE $ mkName "False") vs')
+                        []
+     | NormalC n as <- cs
+     , let str = nameBase n
+     , str /= t ++ "_Var"
+       ]
+ b <- [| $(dyn "t") == $(dyn "v") |]
+ let d = Clause [VarP $ mkName "t" , ConP (mkName $ t ++ "_Var") [VarP $ mkName "v"]]
+                (NormalB b)
+                []
+ return $ FunD (mkName "checkForVar") $ d : ds
 
 -- | Pretty instance of ProcArg.
 procArgPrettyInst :: Dec -> Dec
@@ -182,7 +200,52 @@ procTypeMechs =
               , dataProcList , listp ] ++ ptype ++ ltype
 
 deriveProcTypeInsts :: Q [Dec]
-deriveProcTypeInsts = return $ fmap procTypeInst procTypeNames
+deriveProcTypeInsts = fmap (++isVarIn) $ mapM (
+  \t -> do d <- checkForVar t
+           return $ procTypeInst t d
+    ) procTypeNames
+
+isVarIn :: [Dec]
+isVarIn = isVarInArg ++ isVarInAssign ++ assignVarName
+
+-- isVarInArg :: Text -> ProcArg -> Bool
+isVarInArg :: [Dec]
+isVarInArg = [ SigD (mkName "isVarInArg") $ textt ->. argt ->. boolt
+             , FunD (mkName "isVarInArg") $ fmap f procTypeNames ]
+  where
+   textt = ConT $ mkName "Text"
+   argt  = ConT $ mkName "ProcArg"
+   boolt = ConT $ mkName "Bool"
+   f t = Clause [VarP $ mkName "t" , ConP (mkName $ t ++ "Arg") [VarP $ mkName "x"]]
+                (NormalB $ VarE (mkName "checkForVar") `AppE` VarE (mkName "t") `AppE` VarE (mkName "x"))
+                []
+
+-- isVarInAssign :: Text -> ProcAssign -> Bool
+isVarInAssign :: [Dec]
+isVarInAssign = [ SigD (mkName "isVarInAssign") $ textt ->. argt ->. boolt
+                , FunD (mkName "isVarInAssign") $ fmap f procTypeNames ]
+  where
+   textt = ConT $ mkName "Text"
+   argt  = ConT $ mkName "ProcAssign"
+   boolt = ConT $ mkName "Bool"
+   f t = Clause [VarP $ mkName "t" , ConP (mkName $ t ++ "Assign") [WildP, VarP $ mkName "x"]]
+                (NormalB $ VarE (mkName "checkForVar") `AppE` VarE (mkName "t") `AppE` VarE (mkName "x"))
+                []
+
+-- assignVarName :: ProcAssign -> Text
+assignVarName :: [Dec]
+assignVarName = [ SigD (mkName "assignVarName") $ ConT (mkName "ProcAssign") ->. ConT (mkName "Text")
+                , FunD (mkName "assignVarName") $ fmap f procTypeNames ]
+  where
+   f t = Clause [ConP (mkName $ t ++ "Assign") [VarP $ mkName "t",WildP]]
+                (NormalB $ VarE $ mkName "t") []
+
+infixr 4 ->.
+
+(->.) :: Type -> Type -> Type
+t1 ->. t2 = ArrowT `AppT` t1 `AppT` t2
+
+-- CUSTOM VALUES
 
 deriveCustomValues :: Q [Dec]
 deriveCustomValues = do
