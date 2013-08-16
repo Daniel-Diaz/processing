@@ -6,6 +6,7 @@ import Graphics.Web.Processing.Mid.CustomVar
 import Graphics.Web.Processing.Html
 import Control.Applicative
 import GHC.Generics (Generic)
+import Data.Monoid ((<>))
 
 -- | Tile types:
 --
@@ -285,6 +286,9 @@ pacmanScript rows cols dots map = execScriptM $ do
                          when (t #== 1) $ drawAt i j drawDot) tdots -- Dots
      mapM_ (\(i,j) -> do t <- getTile i j
                          when (t #== 2) $ drawAt i j drawEnergizer) tenergizers -- Energizers
+     -- Draw helper
+     drawAt (-1) 0 $ \p -> drawtext (fromStText $ "Use Arrow keys to move. Yellow dots will make "
+                                  <> "ghosts not follow you for a few seconds.") p 500 200
      -- Remove ghost walls after the first scatter time
      when (chaseMode st) $ mapM_ (\(i,j) -> writeArrayVar mapv (tileIndex i j) 0) tgwalls
      -- Cycle scalar
