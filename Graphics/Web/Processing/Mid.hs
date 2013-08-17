@@ -50,6 +50,7 @@ module Graphics.Web.Processing.Mid (
   , ScriptM
   , on
   , execScriptM
+  , execScriptMFast
     -- * Variables
   , module Graphics.Web.Processing.Core.Var
     -- * Interface
@@ -238,15 +239,11 @@ on c (EventM e) = ScriptM $ modify $ \ss ->
      f  = addEvent c $ event_code es
  in  f $ ss { script_code = script_code ss >> event_preamble es }
 
--- | Execute the scripter monad to get the full Processing script.
---   Use 'renderScript' or 'renderFile' to render it.
---
---   After generating the script, the output code is optimized
---   using 'optimizeBySubstitution'.
-execScriptM :: ScriptM Preamble () -> ProcScript
-execScriptM (ScriptM s0) =
+-- | Like 'execScriptM', but skips optimizations.
+execScriptMFast :: ScriptM Preamble () -> ProcScript
+execScriptMFast (ScriptM s0) =
   let s = execState s0 emptyScriptState
-  in  optimizeBySubstitution $ ProcScript
+  in  ProcScript
     { proc_preamble = execProcM $ script_code s
     , proc_setup = maybe mempty execProcM $ script_setup s
     , proc_draw = fmap execProcM $ script_draw s
@@ -254,6 +251,14 @@ execScriptM (ScriptM s0) =
     , proc_mouseReleased = fmap execProcM $ script_mouseReleased s
     , proc_keyPressed = fmap execProcM $ script_keyPressed s
       }
+
+-- | Execute the scripter monad to get the full Processing script.
+--   Use 'renderScript' or 'renderFile' to render it.
+--
+--   After generating the script, the output code is optimized
+--   using 'optimizeBySubstitution'.
+execScriptM :: ScriptM Preamble () -> ProcScript
+execScriptM = optimizeBySubstitution . execScriptMFast
 
 -- Coercions
 
