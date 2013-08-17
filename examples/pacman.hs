@@ -1,6 +1,14 @@
 
 {-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
 
+{- Pac-Man game
+
+An uploaded version can be reached at:
+
+http://daniel-diaz.github.io/projects/processing/pacman.html
+
+-}
+
 import Graphics.Web.Processing.Mid
 import Graphics.Web.Processing.Mid.CustomVar
 import Graphics.Web.Processing.Html

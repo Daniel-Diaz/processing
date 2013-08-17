@@ -24,9 +24,16 @@ Description:
   .
   /Where can I see a running example?/
   .
-  An example output can be reached at <http://liibe.com/experimental/rocket.html>.
-  Also, take a look at <http://liibe.com/experimental/mill.html>.
-  The code of the latter is included in the source distribution (\/examples\/mill.hs).
+  Running examples are provided in the /examples/ directory.
+  These are some of the outputs:
+  .
+  * Mill demo. Preview: <http://daniel-diaz.github.io/projects/processing/mill.html>.
+               Code: <https://github.com/Daniel-Diaz/processing/blob/master/examples/mill.hs>.
+  .
+  * Pacman demo. Preview: <http://daniel-diaz.github.io/projects/processing/pacman.html>.
+                 Code: <https://github.com/Daniel-Diaz/processing/blob/master/examples/pacman.hs>.
+  .
+  The code of the latter is included in the source distribution.
   .
   /How do I learn to use it?/
   .

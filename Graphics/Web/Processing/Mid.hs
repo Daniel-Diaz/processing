@@ -31,11 +31,13 @@
 --   Note that to make it work, the context of the script /must/ be
 --   'Preamble'.
 --
---   Interaction with variables is done via the 'ProcVarMonad' class.
---   This class defines methods to interact with variables in both the
+--   Interaction with variables is done via the interface provided by
+--   the "Graphics.Web.Processing.Core.Var" module.
+--   This module defines functions to interact with variables in both the
 --   'ScriptM' monad and the 'EventM' monad.
 --   To store custom types in variables, see the
---   "Graphics.Web.Processing.Mid.CustomVar" module.
+--   "Graphics.Web.Processing.Mid.CustomVar" module (you have to import
+--   this module separately).
 --
 --   Once your script is complete, use 'execScriptM' to get the result
 --   code.
