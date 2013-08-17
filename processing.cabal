@@ -7,7 +7,7 @@ License: BSD3
 License-file: license
 Maintainer: Daniel Díaz (dhelta.diaz `at` gmail.com)
 Bug-reports: https://github.com/Daniel-Diaz/processing/issues
-Synopsis: Web graphic applications with Processing.
+Synopsis: Web graphic applications with processing.js.
 Stability: In development
 Tested-with: GHC == 7.6.3
 Description:
