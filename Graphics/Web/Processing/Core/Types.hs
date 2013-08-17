@@ -38,6 +38,8 @@ module Graphics.Web.Processing.Core.Types (
   -- ** Text
   , Proc_Text
   , fromStText
+  , (+.+)
+  , Proc_Show (..)
   -- ** Image
   , Proc_Image
   -- * Processing classes

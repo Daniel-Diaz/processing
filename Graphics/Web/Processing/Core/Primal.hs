@@ -36,6 +36,8 @@ module Graphics.Web.Processing.Core.Primal (
   , Proc_Char , fromChar
   -- *** Text
   , Proc_Text, fromStText
+  , (+.+)
+  , Proc_Show (..)
   -- *** Keys
   , Proc_Key (..)
   , Proc_KeyCode (..)
@@ -693,9 +695,24 @@ instance Pretty Proc_Char where
 data Proc_Text =
    Proc_Text Text
  | Text_Var Text
+   -- Proc_Show
+   -- See <http://processingjs.org/reference/str_> for avaiable
+   -- types.
+ | Show_Bool Proc_Bool
+ | Show_Char Proc_Char
+ | Show_Float Proc_Float
+ | Show_Int Proc_Int
+   -- String appending
+ | Text_Append Proc_Text Proc_Text
    -- Conditional
  | Text_Cond Proc_Bool Proc_Text Proc_Text
    deriving (Eq,Ord,Generic)
+ 
+infixr 5 +.+
+
+-- | Append two text strings.
+(+.+) :: Proc_Text -> Proc_Text -> Proc_Text
+(+.+) = Text_Append
 
 instance PArbitrary Proc_Text
 
@@ -711,6 +728,15 @@ instance Pretty Proc_Text where
  -- escape characters.
  ppr (Proc_Text t) = enclose dquote dquote (fromText t)
  ppr (Text_Var n) = fromText n
+ --
+ ppr (Show_Bool  x) = pfunction "str" [ppr x]
+ ppr (Show_Char  x) = pfunction "str" [ppr x]
+ ppr (Show_Float x) = pfunction "str" [ppr x]
+ ppr (Show_Int   x) = pfunction "str" [ppr x]
+ -- No parenthesis are included since appending is the
+ -- only operation over text.
+ ppr (Text_Append x y) = ppr x <+> fromText "+" <+> ppr y
+ --
  ppr (Text_Cond b x y) = parens $ docCond (ppr b) (ppr x) (ppr y)
 
 -- | Cast a strict 'Text' value.
@@ -719,6 +745,23 @@ fromStText = extend
 
 instance IsString Proc_Text where
  fromString = fromStText . fromString
+
+-- | Similar to the 'Show' class, but for @Proc_*@ types.
+class Proc_Show a where
+  -- | Render a value as a 'Proc_Text'.
+  pshow :: a -> Proc_Text
+
+instance Proc_Show Proc_Bool where
+  pshow = Show_Bool
+
+instance Proc_Show Proc_Char where
+  pshow = Show_Char
+
+instance Proc_Show Proc_Float where
+  pshow = Show_Float
+
+instance Proc_Show Proc_Int where
+  pshow = Show_Int
 
 -- | Type of keyboard keys.
 data Proc_Key =
