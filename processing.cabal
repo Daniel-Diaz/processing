@@ -69,6 +69,7 @@ Extra-source-files:
   examples/keys.hs
   examples/random.hs
   examples/pacman.hs
+  examples/pacman.map
 
 Source-repository head
   type: git
@@ -121,11 +122,11 @@ Library
     Graphics.Web.Processing.Core.Monad
   Extensions: OverloadedStrings
             , EmptyDataDecls
-            -- , DeriveGeneric
+            -- , DeriveGeneric (used, but not recognized)
             , MultiParamTypeClasses
             , FunctionalDependencies
             , TypeOperators
-            -- , DefaultSignatures
+            -- , DefaultSignatures (used, but not recognized)
             , FlexibleContexts
   GHC-Options: -Wall
   if flag(info)
