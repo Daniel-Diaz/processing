@@ -15,6 +15,20 @@ import Control.Monad
 import Data.Maybe (catMaybes)
 import Data.List (isSuffixOf)
 
+{- About this module
+
+This module gathers all the Template Haskell definitions
+of the library.
+
+Currently, the code is a mess, even when it works as
+expected. However, that it works is not enough. The
+code should be readable and easy to maintain as well.
+Therefore, refactor this module and write the appropiate
+code annotations to make it easy to understand is in
+the to-do list.
+
+-}
+
 {- RECURSOR -}
 
 -- | Define recursor over a data type. The recursor will apply an inner function
