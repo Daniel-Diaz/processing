@@ -5,7 +5,7 @@ import Graphics.Web.Processing.Simple
 import Graphics.Web.Processing.Html
 
 main :: IO ()
-main = writeHtml "processing.js" "sierpinski.pde" "Sierpinski demo" "Site/experimental/sierpinski.html" theScript
+main = writeHtml "processing.js" "sierpinski.pde" "Sierpinski demo" "sierpinski.html" theScript
 
 theScript :: ProcScript
 theScript = displayFigure Nothing Nothing (Color 0 0 0 255) $
