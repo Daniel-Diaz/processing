@@ -70,6 +70,7 @@ Extra-source-files:
   examples/random.hs
   examples/pacman.hs
   examples/pacman.map
+  examples/sierpinski.hs
 
 Source-repository head
   type: git
