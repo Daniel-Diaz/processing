@@ -1,7 +1,7 @@
 
 {-# LANGUAGE OverloadedStrings, MultiParamTypeClasses, FunctionalDependencies,
              DeriveGeneric, TypeOperators, DefaultSignatures, FlexibleContexts,
-             TemplateHaskell
+             TemplateHaskell, CPP
   #-}
 
 {- | Internal core module.
@@ -80,6 +80,11 @@ import Test.QuickCheck.Instances()
 -- Meta-programming
 import GHC.Generics
 import Graphics.Web.Processing.Core.TH
+
+#if MIN_VERSION_mainland_pretty(0,4,0)
+fromText :: Text -> Doc
+fromText = strictText
+#endif
 
 ------------------------------------------------
 -- QUICK CHECK DERIVING
